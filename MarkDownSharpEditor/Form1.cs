@@ -32,8 +32,8 @@ namespace MarkDownSharpEditor
 		static extern int CoInternetSetFeatureEnabled(int FeatureEntry, [MarshalAs(UnmanagedType.U4)] int dwFlags, bool fEnable);
 
 		//-----------------------------------
-		int undoCounter = 0;                                              // Undo buffer counter
-		List<string> UndoBuffer = new List<string>();
+		//int undoCounter = 0;                                              // Undo buffer counter
+		//List<string> UndoBuffer = new List<string>();
 		private bool _fSearchStart = false;                                //検索を開始したか ( Start search flag )
 		private int _richEditBoxInternalHeight;                            //richTextBox1の内部的な高さ ( internal height of richTextBox1 component )
 		private int _WebBrowserInternalHeight;                             //webBrowser1の内部的な高さ（body）( internal height of webBrowser1 component )
@@ -48,13 +48,28 @@ namespace MarkDownSharpEditor
 		private Encoding _EditingFileEncoding = Encoding.UTF8;             //編集中MDファイルの文字エンコーディング ( Character encoding of MD file editing )
 
 		private bool _fConstraintChange = true;	                           //更新状態の抑制 ( Constraint changing flag )
-		private ICollection<MarkdownSyntaxKeyword> _MarkdownSyntaxKeywordAarray;
+		//private ICollection<MarkdownSyntaxKeyword> _MarkdownSyntaxKeywordAarray;
+
+        private Azuki.AzukeRTF richTextBox1;
+        private Azuki.MarkdownHighlighter highlighter;
+
 		//-----------------------------------
 		// コンストラクタ ( Constructor )
 		//-----------------------------------
 		public Form1()
 		{
 			InitializeComponent();
+
+            // RichTextBox を Azuki に置き換え 
+            highlighter = new Azuki.MarkdownHighlighter(this.azukiRichTextBox1.Document);
+            this.azukiRichTextBox1.Highlighter = highlighter;
+            this.azukiRichTextBox1.ColorScheme = highlighter.MarkDownColorScheme;
+            this.azukiRichTextBox1.Document.EolCode = "\n";
+            
+            richTextBox1 = new Azuki.AzukeRTF(this.azukiRichTextBox1);
+
+            this.azukiRichTextBox1.DrawsEofMark = true;
+            this.azukiRichTextBox1.ViewType = Sgry.Azuki.ViewType.WrappedProportional;
 
 			//IME Handler On/Off
 			if (MarkDownSharpEditor.AppSettings.Instance.Lang == "ja")
@@ -66,8 +81,9 @@ namespace MarkDownSharpEditor
 				richTextBox1.IMEWorkaroundEnabled = false;
 			}
 
-			this.richTextBox1.DragEnter += new System.Windows.Forms.DragEventHandler(this.richTextBox1_DragEnter);
-			this.richTextBox1.DragDrop += new System.Windows.Forms.DragEventHandler(this.richTextBox1_DragDrop);
+            this.azukiRichTextBox1.DragEnter += new System.Windows.Forms.DragEventHandler(this.richTextBox1_DragEnter);
+            this.azukiRichTextBox1.DragDrop += new System.Windows.Forms.DragEventHandler(this.richTextBox1_DragDrop);
+
 			richTextBox1.AllowDrop = true;
 
 			//設定を読み込む ( Read options )
@@ -156,7 +172,7 @@ namespace MarkDownSharpEditor
 
 			//エディターのシンタックスハイライター設定の反映
 			//Syntax highlighter of editor window is enabled 
-			_MarkdownSyntaxKeywordAarray = MarkdownSyntaxKeyword.CreateKeywordList();
+			//_MarkdownSyntaxKeywordAarray = MarkdownSyntaxKeyword.CreateKeywordList();
 
 			//-----------------------------------
 			//選択中のエンコーディングを表示
@@ -526,6 +542,7 @@ namespace MarkDownSharpEditor
 			//-----------------------------------
 			// Add undo buffer
 			//-----------------------------------
+#if false
 
 			//現在のUndoCounterから先を削除
 			//Remove first item of undo counter
@@ -543,8 +560,8 @@ namespace MarkDownSharpEditor
 			{
 				e.Handled = true;
 			}
-
-			timer2.Enabled = true;
+#endif
+            timer2.Enabled = true;
 
 		}
 		
@@ -752,7 +769,7 @@ namespace MarkDownSharpEditor
 		// richTextBox1 DragEnter event
 		//-----------------------------------
 		private void richTextBox1_DragEnter(object sender, System.Windows.Forms.DragEventArgs e)
-		{
+        {
 			if (e.Data.GetDataPresent(DataFormats.FileDrop) == true)
 			{
 				e.Effect = DragDropEffects.Copy;
@@ -761,13 +778,13 @@ namespace MarkDownSharpEditor
 			{
 				e.Effect = DragDropEffects.None;
 			}
-		}
+        }
 
 		//-----------------------------------
 		// richTextBox1 Drag and Drop event
 		//-----------------------------------
 		private void richTextBox1_DragDrop(object sender, System.Windows.Forms.DragEventArgs e)
-		{
+        {
 			string[] FileArray = (string[])e.Data.GetData(DataFormats.FileDrop, false);
 			if (FileArray.Length > 1)
 			{
@@ -850,7 +867,7 @@ namespace MarkDownSharpEditor
 
 				BatchOutputToHtmlFiles((String[])ArrayFileList.ToArray(typeof(string)));
 
-			}
+        	}
 			else if (FileArray.Count() == 1)
 			{
 				//ファイルが一個の場合は編集中のウィンドウで開く
@@ -1041,10 +1058,11 @@ namespace MarkDownSharpEditor
 
 			//Undoバッファに追加
 			//Add all text to undo buffer
-			UndoBuffer.Clear();
-			UndoBuffer.Add(richTextBox1.Rtf);
-			undoCounter = UndoBuffer.Count;
-			
+			//UndoBuffer.Clear();
+			//UndoBuffer.Add(richTextBox1.Rtf);
+			//undoCounter = UndoBuffer.Count;
+            this.azukiRichTextBox1.Document.IsDirty = false;
+
 			//プレビュー更新
 			PreviewToBrowser();
 
@@ -1458,7 +1476,7 @@ namespace MarkDownSharpEditor
             {
                 browserWaitTimer.Enabled = false;
                 return;
-			}
+            }
 
             timerCount++;
 
@@ -1467,15 +1485,15 @@ namespace MarkDownSharpEditor
                 waitObject.SetResult("OK");
                 waitObject = null;
                 browserWaitTimer.Enabled = false;
-			}
+            }
             else if (timerCount > 20)
             {
                 // 反応ないので終わりにする
                 waitObject.SetResult("OK");
                 waitObject = null;
                 browserWaitTimer.Enabled = false;
-			}
-		}
+            }
+        }
 
         System.Threading.Tasks.TaskCompletionSource<string> waitObject = null;
         int timerCount = 0;
@@ -1500,6 +1518,7 @@ namespace MarkDownSharpEditor
 			}
 
 			var result = new List<SyntaxColorScheme>();
+#if false
 			foreach (MarkdownSyntaxKeyword mk in _MarkdownSyntaxKeywordAarray)
 			{
 				MatchCollection col = mk.Regex.Matches(text, 0);
@@ -1517,7 +1536,8 @@ namespace MarkDownSharpEditor
 					}
 				}
 			}
-			e.Result = result;
+#endif
+            e.Result = result;
 		}
 		//----------------------------------------------------------------------
 		// BackgroundWorker Editor Syntax hightlighter progress changed
@@ -1544,6 +1564,7 @@ namespace MarkDownSharpEditor
 
 			var obj = MarkDownSharpEditor.AppSettings.Instance;
 
+#if false
 			Font fc = richTextBox1.Font;          //現在のフォント設定 ( Font option )
 			bool fModify = richTextBox1.Modified;	//現在の編集状況 ( Modified flag )
 
@@ -1570,17 +1591,16 @@ namespace MarkDownSharpEditor
 				richTextBox1.SelectionColor = s.ForeColor;
 				richTextBox1.SelectionBackColor = s.BackColor;
 			}
-
-			//カーソル位置を戻す / Restore cursor position
+            //カーソル位置を戻す / Restore cursor position
 			richTextBox1.Select(selectStart, selectEnd);
 			richTextBox1.AutoScrollOffset = CurrentOffset;
 			richTextBox1.VerticalPosition = CurrentScrollPos;
 
 			//描画再開 / Resume to paint
 			richTextBox1.EndUpdate();
-			richTextBox1.Modified = fModify;
-
-			_fConstraintChange = false;
+            richTextBox1.Modified = fModify;
+#endif
+            _fConstraintChange = false;
 
 			if (MarkDownSharpEditor.AppSettings.Instance.AutoBrowserPreviewInterval < 0)
 			{
@@ -2109,6 +2129,7 @@ namespace MarkDownSharpEditor
 			_fNoTitle = true;
 			richTextBox1.Text = "";
 			richTextBox1.Modified = false;
+            azukiRichTextBox1.Document.ClearHistory();
 			FormTextChange();
 			_fConstraintChange = false;
 
@@ -2210,8 +2231,9 @@ namespace MarkDownSharpEditor
 
 			//Undoバッファクリア
 			//Clear undo buffer
-			undoCounter = 0;
-			UndoBuffer.Clear();
+			//undoCounter = 0;
+			//UndoBuffer.Clear();
+            azukiRichTextBox1.Document.ClearHistory();
 
 			_fNoTitle = false;	//無題フラグOFF
 			richTextBox1.Modified = false;
@@ -2347,6 +2369,7 @@ namespace MarkDownSharpEditor
 		//-----------------------------------
 		private void menuEdit_Click(object sender, EventArgs e)
 		{
+#if false
 			if (undoCounter > 0)
 			{
 				menuUndo.Enabled = true;
@@ -2364,8 +2387,11 @@ namespace MarkDownSharpEditor
 			{
 				menuRedo.Enabled = false;
 			}
-
-			if (richTextBox1.SelectionLength > 0)
+#else
+            menuUndo.Enabled = this.azukiRichTextBox1.Document.CanUndo;
+            menuRedo.Enabled = this.azukiRichTextBox1.Document.CanRedo;
+#endif
+            if (richTextBox1.SelectionLength > 0)
 			{
 				menuCut.Enabled = true;
 				menuCopy.Enabled = true;
@@ -2382,6 +2408,7 @@ namespace MarkDownSharpEditor
 		//-----------------------------------
 		private void menuUndo_Click(object sender, EventArgs e)
 		{
+#if false
 			if (UndoBuffer.Count > 0 && undoCounter > 0)
 			{	//現在のカーソル位置
 				//Current cursor position
@@ -2413,20 +2440,28 @@ namespace MarkDownSharpEditor
 					FormTextChange();
 				}
 			}
-		}
+#else
+            this.azukiRichTextBox1.Document.Undo();
+#endif
+
+        }
 		//-----------------------------------
 		//「やり直す」メニュー
 		// "Redo" menu
 		//-----------------------------------
 		private void menuRedo_Click(object sender, EventArgs e)
 		{
+#if false
 			if (undoCounter < UndoBuffer.Count && undoCounter > 0)
 			{
 				undoCounter++;
 				richTextBox1.Rtf = UndoBuffer[undoCounter];
 				FormTextChange();
 			}
-		}
+#else
+            this.azukiRichTextBox1.Document.Redo();
+#endif
+        }
 		//-----------------------------------
 		//「切り取り」メニュー
 		// "Cut" to clipbord menu
@@ -2640,7 +2675,7 @@ namespace MarkDownSharpEditor
 		//-----------------------------------
 		private void menuFont_Click(object sender, EventArgs e)
 		{
-			bool fModify = richTextBox1.Modified;
+			//bool fModify = richTextBox1.Modified;
 			fontDialog1.Font = richTextBox1.Font;
 			fontDialog1.Color = richTextBox1.ForeColor;
 			//選択できるポイントサイズの最小・最大値
@@ -2656,8 +2691,8 @@ namespace MarkDownSharpEditor
 			//ダイアログを表示する
 			if (fontDialog1.ShowDialog() == DialogResult.OK)
 			{
-				UndoBuffer.Add(richTextBox1.Rtf);
-				undoCounter = UndoBuffer.Count;
+				//UndoBuffer.Add(richTextBox1.Rtf);
+				//undoCounter = UndoBuffer.Count;
 				this.richTextBox1.TextChanged -= new System.EventHandler(this.richTextBox1_TextChanged);
 				richTextBox1.Font = fontDialog1.Font;
 				richTextBox1.ForeColor = fontDialog1.Color;
@@ -2666,8 +2701,8 @@ namespace MarkDownSharpEditor
 					fontDialog1.Font.Name + "," + fontDialog1.Font.Size.ToString() + "pt";
 				this.richTextBox1.TextChanged += new System.EventHandler(this.richTextBox1_TextChanged);
 			}
-			//richTextBoxの書式を変えても「変更」となるので元のステータスへ戻す
-			richTextBox1.Modified = fModify;
+			////richTextBoxの書式を変えても「変更」となるので元のステータスへ戻す
+			//richTextBox1.Modified = fModify;
 		}
 
 		//-----------------------------------
@@ -2680,7 +2715,12 @@ namespace MarkDownSharpEditor
 			frm3.ShowDialog();
 			frm3.Dispose();
 
-			_MarkdownSyntaxKeywordAarray = MarkdownSyntaxKeyword.CreateKeywordList();	 //キーワードリストの更新
+			//_MarkdownSyntaxKeywordAarray = MarkdownSyntaxKeyword.CreateKeywordList();	 //キーワードリストの更新
+
+            highlighter = new Azuki.MarkdownHighlighter(this.azukiRichTextBox1.Document);
+            this.azukiRichTextBox1.Highlighter = highlighter;
+            this.azukiRichTextBox1.ColorScheme = highlighter.MarkDownColorScheme;
+
 			if (backgroundWorker2.IsBusy == false)
 			{
 				//SyntaxHightlighter on BackgroundWorker

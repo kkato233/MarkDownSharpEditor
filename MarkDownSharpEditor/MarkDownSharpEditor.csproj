@@ -84,6 +84,10 @@
     <ApplicationManifest>Properties\app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Azuki, Version=1.7.7.903, Culture=neutral, PublicKeyToken=46b77eb7f2d82aba, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Azuki_bin\Azuki.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="PresentationFramework" />
     <Reference Include="System" />
@@ -103,6 +107,8 @@
   <ItemGroup>
     <Compile Include="AppHistory.cs" />
     <Compile Include="AppSettings.cs" />
+    <Compile Include="Azuki\AzukiExtentions.cs" />
+    <Compile Include="Azuki\MarkdownHighlighter.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
@@ -221,7 +227,6 @@
     <Content Include="main.ico" />
     <None Include="Resources\strike.png" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>"$(SolutionDir)tools\ResHacker\ResHacker.exe" -addoverwrite "$(TargetPath)", "$(TargetPath)", "$(ProjectDir)markdownsharpeditor.res" ,,,</PostBuildEvent>

@@ -25,10 +25,10 @@ namespace MarkdownDeep
 	{
 		Blank,			// blank line (parse only)
 		h1,				// headings (render and parse)
-		h2,
-		h3,
-		h4,
-		h5,
+		h2, 
+		h3, 
+		h4, 
+		h5, 
 		h6,
 		post_h1,		// setext heading lines (parse only)
 		post_h2,
@@ -42,7 +42,7 @@ namespace MarkdownDeep
 		html,			// html content (render and parse)
 		unsafe_html,	// unsafe html that should be encoded
 		span,			// an undecorated span of text (used for simple list items 
-		//			where content is not wrapped in paragraph tags
+						//			where content is not wrapped in paragraph tags
 		codeblock,		// a code block (render only)
 		li,				// a list item (render only)
 		ol,				// ordered list (render only)
@@ -57,6 +57,55 @@ namespace MarkdownDeep
 		p_footnote,		// paragraph with footnote return link append.  Return link string is in `data`.
 	}
 
+    class ContentStartEndInfo
+    {
+        public string buf;
+        public int contentStart;
+        public int contentLen;
+
+        public void Trim()
+        {
+            if (buf == null) return;
+#if DEBUG
+            string beforData = this.Content;
+#endif
+            // TrimStart
+            while (contentLen > 0)
+            {
+                char c = buf[contentStart];
+                if (char.IsWhiteSpace(c))
+                {
+                    contentStart++;
+                    contentLen--;
+                }
+            }
+            // TrimEnd
+            while (contentLen > 0)
+            {
+                char c = buf[contentStart + contentLen - 1];
+                if (char.IsWhiteSpace(c))
+                {
+                    contentLen--;
+                }
+            }
+#if DEBUG
+            string afterData = this.Content;
+            System.Diagnostics.Debug.Assert(afterData == beforData.Trim());
+#endif
+        }
+#if DEBUG
+        public string Content
+        {
+            get
+            {
+                if (buf == null) return null;
+                if (contentStart < 0) return buf;
+                return buf.Substring(contentStart, contentLen);
+            }
+        }
+#endif
+    }
+
 	class Block
 	{
 		internal Block()
@@ -68,6 +117,91 @@ namespace MarkdownDeep
 		{
 			blockType = type;
 		}
+
+        /// <summary>
+        /// Content.Split('\n') の代用品として利用する
+        /// </summary>
+        /// <returns></returns>
+        public List<ContentStartEndInfo> ContentSplitLines()
+        {
+            List<ContentStartEndInfo> ans = new List<ContentStartEndInfo>();
+
+            if (blockType == BlockType.codeblock)
+            {
+                foreach (var line in children)
+                {
+                    ans.Add(new ContentStartEndInfo()
+                    {
+                       buf = line.buf,
+                       contentStart = line.contentStart,
+                       contentLen = line.contentLen,
+                    });
+                }
+#if DEBUG
+                CheckContentSplit(ans);
+#endif
+                return ans;
+            }
+            
+            if (buf == null)
+            {
+                return null;
+            }
+            else
+            {
+                int startPos = Math.Max(0, contentStart);
+                int endPos = startPos + contentLen;
+                int findPos = buf.IndexOf('\n', startPos);
+                while (findPos >= 0 && findPos < endPos )
+                {
+                    ans.Add(new ContentStartEndInfo()
+                    {
+                        buf = buf,
+                        contentStart = contentStart,
+                        contentLen = findPos - startPos,
+                    });
+
+                    startPos = findPos + 1;
+                    findPos = buf.IndexOf('\n', startPos);
+                }
+
+                // 残りの部分を登録する
+                if (startPos < endPos)
+                {
+                    ans.Add(new ContentStartEndInfo()
+                    {
+                        buf = buf,
+                        contentStart = startPos,
+                        contentLen = contentStart + contentLen - startPos,
+                    });
+                }
+#if DEBUG
+                CheckContentSplit(ans);
+#endif
+                return ans;
+            }
+        }
+
+#if DEBUG
+        private void CheckContentSplit(List<ContentStartEndInfo> cList)
+        {
+            List<string> list = new List<string>();
+            foreach (var l in Content.Split('\n'))
+            {
+                list.Add(l);
+            }
+            List<string> list2 = new List<string>();
+
+            foreach (var c in cList)
+            {
+                list2.Add(c.Content);
+            }
+
+            System.Diagnostics.Debug.Assert(list.Count == list2.Count);
+            System.Diagnostics.Debug.Assert(string.Join("-", list) ==
+                string.Join("-", list2));
+        }
+#endif
 
 		public string Content
 		{
@@ -86,7 +220,7 @@ namespace MarkdownDeep
 				}
 
 
-				if (buf == null)
+				if (buf==null)
 					return null;
 				else
 					return contentStart == -1 ? buf : buf.Substring(contentStart, contentLen);
@@ -105,6 +239,7 @@ namespace MarkdownDeep
 		{
 			foreach (var block in children)
 			{
+                block.ParentBlock = this;
 				block.Render(m, b);
 			}
 		}
@@ -120,11 +255,11 @@ namespace MarkdownDeep
 		internal string ResolveHeaderID(Markdown m)
 		{
 			// Already resolved?
-			if (this.data != null)
+			if (this.data!=null)
 				return (string)this.data;
 
 			// Approach 1 - PHP Markdown Extra style header id
-			int end = contentEnd;
+			int end=contentEnd;
 			string id = Utils.StripHtmlID(buf, contentStart, ref end);
 			if (id != null)
 			{
@@ -148,10 +283,27 @@ namespace MarkdownDeep
 					return;
 
 				case BlockType.p:
-					m.SpanFormatter.FormatParagraph(b, buf, contentStart, contentLen);
+                    {
+                        int offset = 0;
+                        if (contentLen == 0 && this.ParentBlock != null)
+                        {
+                            offset = this.ParentBlock.contentStart;
+                        }
+                        else if (this.ParentBlock != null && this.ParentBlock.buf == null && this.ParentBlock.ParentBlock != null)
+                        {
+                            offset = this.ParentBlock.contentStart;
+                        }
+                        m.SpanFormatter.FormatParagraph(b, buf, contentStart, contentLen, offset, m.RenderPos);
+                    }
 					break;
 
 				case BlockType.span:
+                    if (m.RenderPos)
+                    {
+                        b.Append("<span ");
+                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append("</span>");
+                    }
 					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
 					b.Append("\n");
 					break;
@@ -165,6 +317,10 @@ namespace MarkdownDeep
 					if (m.ExtraMode && !m.SafeMode)
 					{
 						b.Append("<" + blockType.ToString());
+                        if (m.RenderPos)
+                        {
+                            b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        }
 						string id = ResolveHeaderID(m);
 						if (!String.IsNullOrEmpty(id))
 						{
@@ -186,7 +342,12 @@ namespace MarkdownDeep
 					break;
 
 				case BlockType.hr:
-					b.Append("<hr />\n");
+                    b.Append("<hr ");
+                    if (m.RenderPos)
+                    {
+                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                    }
+                    b.Append("/>\n");
 					return;
 
 				case BlockType.user_break:
@@ -194,7 +355,12 @@ namespace MarkdownDeep
 
 				case BlockType.ol_li:
 				case BlockType.ul_li:
-					b.Append("<li>");
+                    b.Append("<li");
+                    if (m.RenderPos)
+                    {
+                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                    }
+                    b.Append(">");
 					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
 					b.Append("</li>\n");
 					break;
@@ -212,42 +378,67 @@ namespace MarkdownDeep
 					break;
 
 				case BlockType.dt:
+				{
+					if (children == null)
 					{
-						if (children == null)
+                            //foreach (var l in Content.Split('\n'))
+                            foreach(var c in ContentSplitLines())
 						{
-							foreach (var l in Content.Split('\n'))
-							{
-								b.Append("<dt>");
-								m.SpanFormatter.Format(b, l.Trim());
-								b.Append("</dt>\n");
-							}
-						}
-						else
-						{
-							b.Append("<dt>\n");
-							RenderChildren(m, b);
+							b.Append("<dt>");
+                                //m.SpanFormatter.Format(b, l.Trim());
+                                m.SpanFormatter.Format(b, c.buf, c.contentStart, c.contentLen);
 							b.Append("</dt>\n");
 						}
-						break;
 					}
+					else
+					{
+						b.Append("<dt>\n");
+						RenderChildren(m, b);
+						b.Append("</dt>\n");
+					}
+					break;
+				}
 
 				case BlockType.dl:
-					b.Append("<dl>\n");
+                    b.Append("<dl");
+                    if (m.RenderPos)
+                    {
+                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                    }
+                    b.Append(">\n");
 					RenderChildren(m, b);
 					b.Append("</dl>\n");
 					return;
 
 				case BlockType.html:
+                    if (m.RenderPos)
+                    {
+                        b.Append("<span ");
+                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append("</span>");
+                    }
 					b.Append(buf, contentStart, contentLen);
 					return;
 
 				case BlockType.unsafe_html:
+                    if (m.RenderPos)
+                    {
+                        b.Append("<span ");
+                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append("</span>");
+                    }
 					m.HtmlEncode(b, buf, contentStart, contentLen);
 					return;
 
 				case BlockType.codeblock:
 					if (m.FormatCodeBlock != null)
 					{
+                        if (m.RenderPos)
+                        {
+                            b.Append("<span ");
+                            b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                            b.Append("</span>");
+                        }
 						var sb = new StringBuilder();
 						foreach (var line in children)
 						{
@@ -258,7 +449,12 @@ namespace MarkdownDeep
 					}
 					else
 					{
-						b.Append("<pre><code>");
+                        b.Append("<pre");
+                        if (m.RenderPos)
+                        {
+                            b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        }
+                        b.Append("><code>");
 						foreach (var line in children)
 						{
 							m.HtmlEncodeAndConvertTabsToSpaces(b, line.buf, line.contentStart, line.contentLen);
@@ -269,34 +465,60 @@ namespace MarkdownDeep
 					return;
 
 				case BlockType.quote:
-					b.Append("<blockquote>\n");
+                    b.Append("<blockquote");
+                    if (m.RenderPos)
+                    {
+                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                    }
+                    b.Append(">\n");
 					RenderChildren(m, b);
 					b.Append("</blockquote>\n");
 					return;
 
 				case BlockType.li:
-					b.Append("<li>\n");
+                    b.Append("<li");
+                    if (m.RenderPos)
+                    {
+                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                    }
+                    b.Append(">\n");
 					RenderChildren(m, b);
 					b.Append("</li>\n");
 					return;
 
 				case BlockType.ol:
-					b.Append("<ol>\n");
+                    b.Append("<ol");
+                    if (m.RenderPos)
+                    {
+                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                    }
+                    b.Append(">\n");
 					RenderChildren(m, b);
 					b.Append("</ol>\n");
 					return;
 
 				case BlockType.ul:
-					b.Append("<ul>\n");
+                    b.Append("<ul");
+                    if (m.RenderPos)
+                    {
+                    }
+                    b.Append(">\n");
 					RenderChildren(m, b);
 					b.Append("</ul>\n");
 					return;
 
 				case BlockType.HtmlTag:
+                    if (m.RenderPos)
+                    {
+                        b.Append("<span ");
+                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append("</span>");
+                    }
+
 					var tag = (HtmlTag)data;
 
 					// Prepare special tags
-					var name = tag.name.ToLowerInvariant();
+					var name=tag.name.ToLowerInvariant();
 					if (name == "a")
 					{
 						m.OnPrepareLink(tag);
@@ -319,11 +541,22 @@ namespace MarkdownDeep
 					return;
 
 				case BlockType.table_spec:
+                    if (m.RenderPos)
+                    {
+                        b.Append("<span ");
+                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append("</span>");
+                    }
 					((TableSpec)data).Render(m, b);
 					break;
 
 				case BlockType.p_footnote:
-					b.Append("<p>");
+                    b.Append("<p");
+                    if (m.RenderPos)
+                    {
+                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                    }
+                    b.Append(">");
 					if (contentLen > 0)
 					{
 						m.SpanFormatter.Format(b, buf, contentStart, contentLen);
@@ -334,7 +567,12 @@ namespace MarkdownDeep
 					break;
 
 				default:
-					b.Append("<" + blockType.ToString() + ">");
+                    b.Append("<" + blockType.ToString());
+                    if (m.RenderPos)
+                    {
+                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                    }
+                    b.Append(">");
 					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
 					b.Append("</" + blockType.ToString() + ">\n");
 					break;
@@ -386,10 +624,13 @@ namespace MarkdownDeep
 					{
 						if (children == null)
 						{
-							foreach (var l in Content.Split('\n'))
+							//foreach (var l in Content.Split('\n'))
+                            foreach(var c in ContentSplitLines())
 							{
-								var str = l.Trim();
-								m.SpanFormatter.FormatPlain(b, str, 0, str.Length);
+								//var str = l.Trim();
+                                c.Trim();
+								//m.SpanFormatter.FormatPlain(b, str, 0, str.Length);
+                                m.SpanFormatter.Format(b, c.buf, c.contentStart, c.contentLen);
 							}
 						}
 						else
@@ -466,7 +707,7 @@ namespace MarkdownDeep
 		public override string ToString()
 		{
 			string c = Content;
-			return blockType.ToString() + " - " + (c == null ? "<null>" : c);
+			return blockType.ToString() + " - " + (c==null ? "<null>" : c);
 		}
 
 		public Block CopyFrom(Block other)
@@ -487,6 +728,82 @@ namespace MarkdownDeep
 		internal int lineStart;
 		internal int lineLen;
 		internal object data;			// content depends on block type
-		internal List<Block> children;
+
+        public int contentStartInPage
+        {
+            get
+            {
+                int len = contentStart;
+                Block b = this;
+
+                if (b.ParentBlock != null)
+                {
+                    len = len + b.ParentBlock.contentStart;
+                }
+                return len;
+
+                HashSet<Block> check = new HashSet<Block>();
+                check.Add(this);
+
+                while (b.ParentBlock != null)
+                {
+                    len += b.contentStart;
+                    b = b.ParentBlock;
+                    if (check.Contains(b))
+                    {
+                        // 循環参照を抜ける
+                        break;
+                    }
+                    check.Add(b);
+                }
+
+                return len;
+            }
+        }
+        internal List<Block> children
+        {
+            get
+            {
+                if (_children == null) return null;
+
+                // parent 設定の確認
+                foreach(Block b in _children) {
+                    if (b.ParentBlock != null) {
+                        b.ParentBlock = this;
+                    }
 	}
+
+                return _children;
+            }
+            set
+            {
+                _children = value;
+            }
+        }
+        List<Block> _children;
+
+        /// <summary>
+        /// 親のブロック
+        /// </summary>
+        public Block ParentBlock
+        {
+            get
+            {
+                if (_parent != null && _parent.IsAlive)
+                {
+                    Block b = _parent.Target as Block;
+                    return b;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            set {
+                _parent = new WeakReference(value);
+            }
+        }
+        WeakReference _parent;
+	}
+
 }

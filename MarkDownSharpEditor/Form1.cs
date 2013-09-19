@@ -93,6 +93,8 @@ namespace MarkDownSharpEditor
 			//WebBrowserClickSoundOFF();
 			CoInternetSetFeatureEnabled(FEATURE_DISABLE_NAVIGATION_SOUNDS, SET_FEATURE_ON_PROCESS, true);
 
+            System.Windows.Forms.Application.Idle += Application_Idle;
+
 		}
 
 		//----------------------------------------------------------------------
@@ -235,6 +237,7 @@ namespace MarkDownSharpEditor
 		//----------------------------------------------------------------------
 		private void Form1_Shown(object sender, EventArgs e)
 		{
+            webBrowser1.Navigate("about:blank");
 
 			string DirPath = MarkDownSharpEditor.AppSettings.GetAppDataLocalPath();
 
@@ -1278,6 +1281,7 @@ namespace MarkDownSharpEditor
 			// Create an instance of Markdown
 			//-----------------------------------
 			var mkdwn = new MarkdownDeep.Markdown();
+            mkdwn.RenderPos = true; // data-pos を描画する
 			// Set options
 			mkdwn.ExtraMode = MarkDownSharpEditor.AppSettings.Instance.fMarkdownExtraMode;
 			mkdwn.SafeMode = false;
@@ -1401,8 +1405,9 @@ namespace MarkDownSharpEditor
                         {
                             this.BeginInvoke(new Action(() =>
                             {
-                                doc.Window.ScrollTo(scrollpos);
+                            	ScrollSyncToText();
 
+                            	this.webBrowser1.Document.Body.AttachEventHandler("onclick", OnClickEventHandler);
                                 this.webBrowser1.Document.Body.AttachEventHandler("onscroll", OnScrollEventHandler);
                             }));
                         });
@@ -1632,7 +1637,7 @@ namespace MarkDownSharpEditor
 			_WebBrowserInternalHeight = webBrowser1.Document.Body.ScrollRectangle.Height;
 			//ブラウザのスクロールイベントハンドラ
 			//Browser component event handler
-			webBrowser1.Document.Window.AttachEventHandler("onscroll", OnScrollEventHandler);
+			//webBrowser1.Document.Window.AttachEventHandler("onscroll", OnScrollEventHandler);
 		}
 
 		//----------------------------------------------------------------------
@@ -1640,8 +1645,68 @@ namespace MarkDownSharpEditor
 		//----------------------------------------------------------------------
 		public void OnScrollEventHandler(object sender, EventArgs e)
 		{
-			RichEditBoxMoveCursor();
+            if (this.azukiRichTextBox1.Focused) return;// 特に何もしなくてよい
+
+            ScrollSyncToBrowser();
 		}
+        public void OnClickEventHandler(object sender, EventArgs e)
+        {
+            // マウスがクリックした要素を求める。
+            var pos = this.webBrowser1.PointToClient(MousePosition);
+            var elem = this.webBrowser1.Document.GetElementFromPoint(pos);
+            int dataPos = GetDataPos(elem);
+
+            while (dataPos <= 0 && elem != null)
+            {
+                elem = elem.Parent;
+            }
+
+            if (dataPos > 20)
+            {
+                // まだ完ぺきに data-pos の値が設定できていないので・・仕方ないが・・
+
+                // 指定の文字の位置に移動
+                ScrollSyncTextPos(dataPos);
+            }
+            else
+            {
+                // スクロール位置に合わせて移動
+                ScrollSyncToBrowser();
+            }
+		}
+
+        System.Text.RegularExpressions.Regex regDataPos = new Regex("data-pos=\"(?<pos>[0-9]+)\"");
+
+        /// <summary>
+        /// data-pos="??" の数字を取得する
+        /// </summary>
+        /// <param name="elem"></param>
+        /// <returns></returns>
+        private int GetDataPos(HtmlElement elem)
+        {
+            string outHtml = elem.OuterHtml;
+            List<int> posList = new List<int>();
+            var m = regDataPos.Match(outHtml);
+            while (m.Success)
+            {
+                int pos;
+                if (int.TryParse(m.Groups["pos"].Value, out pos))
+                {
+                    posList.Add(pos);
+                }
+
+                m = m.NextMatch();
+            }
+
+            if (posList.Any())
+            {
+                return posList.Min();
+            }
+            else
+            {
+                return 0;
+            }
+        }
 
 		//----------------------------------------------------------------------
 		// TODO: WebBrowserMoveCursor [RichEditBox → WebBrowser scroll follow]
@@ -1655,6 +1720,8 @@ namespace MarkDownSharpEditor
 
 			if (richTextBox1.Focused == true)
 			{
+                this.ScrollSyncToText();
+#if false
 				//richEditBoxの内部的な高さから現在位置の割合を計算
 				//Calculate current position with internal height of richTextBox1
 				int LineHeight = Math.Abs(richTextBox1.GetPositionFromCharIndex(0).Y);
@@ -1667,12 +1734,226 @@ namespace MarkDownSharpEditor
 				Point webScrollPos = new Point(0, y);
 				//Follow to scroll browser component
 				webBrowser1.Document.Window.ScrollTo(webScrollPos);
-			}
+#endif
+            }
 		}
 
 		//----------------------------------------------------------------------
 		// HACK: RichEditBoxMoveCursor[ WebBrowser → RichEditBox scroll follow]
 		//----------------------------------------------------------------------
+		
+        int beforScrollTop = -1;
+
+        class TagPos
+        {
+            public int OffsetTop;
+            public int OffsetHeight;
+            public IHTMLElement e;
+
+            public int? TextPos;
+            public int OffsetAbsDiff;
+#if DEBUG
+            public string outerText;
+#endif
+        }
+
+        /// <summary>
+        /// 1:テキストに合わせてブラウザをスクロール
+        /// 2:ブラウザに合わせてテキストをスクロール
+        /// </summary>
+        int ScrollSyncMode = -1;
+
+        void Application_Idle(object sender, EventArgs e)
+        {
+            if (ScrollSyncMode == 1)
+            {
+                //テキストに合わせてブラウザをスクロール
+                OnIdle_ScrollSyncToText();
+
+                ScrollSyncMode = 0;
+            }
+            else if (ScrollSyncMode == 2)
+            {
+                // ブラウザに合わせてテキストをスクロール
+                OnIdle_ScrollSyncToBrowser();
+
+                ScrollSyncMode = 0;
+            }
+            else
+            {
+                ScrollSyncMode = -1;
+            }
+        }
+
+        /// <summary>
+        /// テキストに合わせてブラウザをスクロール
+        /// </summary>
+        private void ScrollSyncToText()
+        {
+            if (ScrollSyncMode == -1) {
+                ScrollSyncMode = 1;
+            }
+        }
+
+        /// <summary>
+        /// ブラウザに合わせてテキストをスクロール
+        /// </summary>
+        private void ScrollSyncToBrowser()
+        {
+            if (ScrollSyncMode == -1) {
+                ScrollSyncMode = 2;
+            }
+        }
+
+        /// <summary>
+        /// テキストの指定の位置を表示させる。
+        /// ブラウザのクリックによって目的の位置を表示させるために利用
+        /// </summary>
+        /// <param name="pos"></param>
+        private void ScrollSyncTextPos(int pos)
+        {
+            ScrollSyncMode = -1;
+
+            if (pos >= 0 && pos < this.azukiRichTextBox1.Document.Length)
+            {
+                this.azukiRichTextBox1.SetSelection(pos, pos);
+                this.azukiRichTextBox1.ScrollToCaret();
+            }
+        }
+        /// <summary>
+        /// ブラウザの位置と同期をとる
+        /// </summary>
+        private void OnIdle_ScrollSyncToBrowser()
+        {
+            if (this.azukiRichTextBox1.Focused) return; // スクロールさせない
+
+            IHTMLDocument3 doc3 = (IHTMLDocument3)webBrowser1.Document.DomDocument;
+            IHTMLElement2 elm = (IHTMLElement2)doc3.documentElement;
+
+            if (beforScrollTop == elm.scrollTop) return;
+            int findPos = elm.scrollTop;
+            int scrollMode = 0;
+            if (beforScrollTop < elm.scrollTop)
+            {
+                findPos = findPos + this.webBrowser1.Height;
+                scrollMode = 1;
+            }
+            beforScrollTop = elm.scrollTop;
+
+            var list = GetBrowserDocumentTagPos();
+
+            // 指定の場所に近い順に並び替える
+            if (scrollMode == 0)
+            {
+                foreach (var item in list)
+                {
+                    item.OffsetAbsDiff = Math.Abs(findPos - item.OffsetTop);
+                }
+            }
+            else
+            {
+                foreach (var item in list)
+                {
+                    item.OffsetAbsDiff = Math.Abs(findPos - item.OffsetTop - item.OffsetHeight);
+                }
+            }
+
+            list = list.Where(r => r.TextPos != null)
+                .OrderBy(r => r.OffsetAbsDiff)
+                .ThenBy(r => r.TextPos.Value).ToList();
+
+            int findCharPos = -1;
+            foreach (var item in list)
+            {
+                if (item.TextPos > 0)
+                {
+                    findCharPos = item.TextPos.Value;
+                    break;
+                }
+            }
+
+            // 指定の場所にスクロールする
+            if (this.azukiRichTextBox1.Focused == false && findCharPos > 0)
+            {
+                this.azukiRichTextBox1.SetSelection(findCharPos, findCharPos);
+                this.azukiRichTextBox1.ScrollToCaret();
+            }
+        }
+
+        /// <summary>
+        /// テキストの選択位置と同期をとる
+        /// </summary>
+        private void OnIdle_ScrollSyncToText()
+        {
+            int begin;
+            int end;
+            this.azukiRichTextBox1.GetSelection(out begin, out end);
+            
+            // カーソルの画面上の位置
+            var curPos = this.azukiRichTextBox1.GetPositionFromIndex(begin);
+
+            begin = this.azukiRichTextBox1.GetIndexFromPosition(new Point(0, 0));
+
+            var list = GetBrowserDocumentTagPos().Where(r => r.TextPos != null).ToList();
+
+            foreach (var item in list)
+            {
+                item.OffsetAbsDiff = Math.Abs(begin - item.TextPos.Value);
+            }
+            list = list.OrderBy(r => r.OffsetAbsDiff).ToList();
+            var topItem = list.FirstOrDefault();
+            if (topItem != null)
+            {
+                Point scrollPos = new Point(0,topItem.OffsetTop);
+                this.webBrowser1.Document.Window.ScrollTo(scrollPos);
+            }
+        }
+
+        List<TagPos> GetBrowserDocumentTagPos()
+        {
+            IHTMLDocument3 doc3 = (IHTMLDocument3)webBrowser1.Document.DomDocument;
+            IHTMLElement2 elm = (IHTMLElement2)doc3.documentElement;
+
+            List<TagPos> list = new List<TagPos>();
+
+            int minDiff = elm.scrollHeight + 100;
+
+            // 調査する対象のタグ
+            var tags = doc3.getElementsByTagName("body");
+            HTMLBody body = null;
+            if (tags.length > 0)
+            {
+                body = tags.item(0) as HTMLBody;
+            }
+
+            if (body != null)
+            {
+                foreach (IHTMLElement e in body.all)
+                {
+                    var tag = new TagPos()
+                    {
+                        e = e,
+                        OffsetTop = e.offsetTop,
+                        OffsetHeight = e.offsetHeight,
+                    };
+#if DEBUG
+                    tag.outerText = e.outerHTML;
+#endif
+                    string s = e.getAttribute("data-pos") as string;
+                    int pos;
+                    if (string.IsNullOrEmpty(s) == false)
+                    {
+                        if (int.TryParse(s, out pos))
+                        {
+                            tag.TextPos = pos;
+                        }
+                    }
+                    list.Add(tag);
+                }
+            }
+            return list;
+        }
+        
 		private void RichEditBoxMoveCursor()
 		{
 			//ブラウザでのスクロールバーの位置

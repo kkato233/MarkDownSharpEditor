@@ -448,13 +448,19 @@ namespace MarkdownDeep
 						b.Append(m.FormatCodeBlock(m, sb.ToString()));
 					}
 					else
-					{
+                    {
+                        var attr = string.Empty;
+                        if (m.ExtraMode && !string.IsNullOrEmpty(this.codeBlockLang))
+                        {
+                            attr = string.Format(" class=\"{0}\"", this.codeBlockLang);
+                        }
                         b.Append("<pre");
                         if (m.RenderPos)
                         {
                             b.Append(" data-pos='" + contentStart.ToString() + "'");
                         }
-                        b.Append("><code>");
+                        b.Append(">");
+                        b.Append(string.Format("<code{0}>", attr));
 						foreach (var line in children)
 						{
 							m.HtmlEncodeAndConvertTabsToSpaces(b, line.buf, line.contentStart, line.contentLen);
@@ -804,6 +810,7 @@ namespace MarkdownDeep
             }
         }
         WeakReference _parent;
+        internal string codeBlockLang;
 	}
 
 }

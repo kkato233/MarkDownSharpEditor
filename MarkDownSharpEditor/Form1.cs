@@ -1064,7 +1064,7 @@ namespace MarkDownSharpEditor
 			//UndoBuffer.Clear();
 			//UndoBuffer.Add(richTextBox1.Rtf);
 			//undoCounter = UndoBuffer.Count;
-            this.azukiRichTextBox1.Document.IsDirty = false;
+            this.azukiRichTextBox1.Document.ClearHistory();
 
 			//プレビュー更新
 			PreviewToBrowser();
@@ -1875,8 +1875,8 @@ namespace MarkDownSharpEditor
             // 指定の場所にスクロールする
             if (this.azukiRichTextBox1.Focused == false && findCharPos > 0)
             {
-                this.azukiRichTextBox1.SetSelection(findCharPos, findCharPos);
-                this.azukiRichTextBox1.ScrollToCaret();
+                this.richTextBox1.Select(findCharPos, 0);
+                this.richTextBox1.ScrollToCaret();
             }
         }
 

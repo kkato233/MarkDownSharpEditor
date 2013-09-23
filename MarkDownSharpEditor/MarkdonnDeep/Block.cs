@@ -293,6 +293,8 @@ namespace MarkdownDeep
                         {
                             offset = this.ParentBlock.contentStart;
                         }
+
+                        // TODO: この buf に proxy を渡して オリジナルの文字列の位置を子要素に伝えるように改造する
                         m.SpanFormatter.FormatParagraph(b, buf, contentStart, contentLen, offset, m.RenderPos);
                     }
 					break;
@@ -477,7 +479,7 @@ namespace MarkdownDeep
 
 				case BlockType.li:
                     b.Append("<li");
-                    if (m.RenderPos)
+                    if (m.RenderPos && this.proxy != null)
                     {
                         b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }

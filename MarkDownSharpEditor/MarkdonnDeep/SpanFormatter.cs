@@ -73,7 +73,8 @@ namespace MarkdownDeep
 				dest.Append("<p");
                 if (renderPos)
                 {
-                    dest.Append(" data-pos='" + (start + offset).ToString() + "'");
+                    int pos = this.proxy.LocalPosToGlobalPos(start + offset);
+                    dest.Append(" data-pos='" + pos.ToString() + "'");
                     //dest.Append(" contenteditable='true'");
                 }
                 dest.Append(">");

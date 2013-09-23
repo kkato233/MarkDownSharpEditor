@@ -26,7 +26,7 @@ namespace MarkdownDeep
 	static class Utils
 	{
 		// Extension method. Get the last item in a list (or null if empty)
-		public static T Last<T>(this List<T> list) where T : class
+		public static T Last<T>(this List<T> list) where T:class
 		{
 			if (list.Count > 0)
 				return list[list.Count - 1];
@@ -63,6 +63,37 @@ namespace MarkdownDeep
 		}
 
 
+        // Scan a string for a valid identifier.  Identifier must start with alpha or underscore
+        // and can be followed by alpha, digit or underscore
+        // Updates `pos` to character after the identifier if matched
+        public static bool ParseIdentifier(StringProxy str, ref int pos, ref string identifer)
+        {
+            if (pos >= str.Length)
+                return false;
+
+            // Must start with a letter or underscore
+            char c = str[pos];
+            if (!char.IsLetter(c) && c != '_')
+            {
+                return false;
+            }
+
+            // Find the end
+            int startpos = pos;
+            pos++;
+            c = str[pos];
+
+            while (pos < str.Length && (char.IsDigit(c) || char.IsLetter(c) || c == '_'))
+            {
+                pos++;
+                c = str[pos];
+            }
+
+            // Return it
+            identifer = str.Substring(startpos, pos - startpos).str;
+            return true;
+        }
+
 		// Scan a string for a valid identifier.  Identifier must start with alpha or underscore
 		// and can be followed by alpha, digit or underscore
 		// Updates `pos` to character after the identifier if matched
@@ -97,10 +128,10 @@ namespace MarkdownDeep
 
 			int savepos = pos;
 			int len = str.Length;
-			int i = pos + 1;
+			int i = pos+1;
 
 			// Number entity?
-			bool bNumber = false;
+			bool bNumber=false;
 			bool bHex = false;
 			if (i < len && str[i] == '#')
 			{
@@ -119,7 +150,7 @@ namespace MarkdownDeep
 			int contentpos = i;
 			while (i < len)
 			{
-				char ch = str[i];
+				char ch=str[i];
 
 				if (bHex)
 				{
@@ -198,13 +229,13 @@ namespace MarkdownDeep
 			if (str == null)
 				return;
 
-			for (int i = 0; i < str.Length; i++)
+			for (int i=0; i<str.Length; i++)
 			{
 				switch (str[i])
 				{
 					case '&':
 						int start = i;
-						string unused = null;
+						string unused=null;
 						if (SkipHtmlEntity(str, ref i, ref unused))
 						{
 							dest.Append(str, start, i - start);
@@ -336,13 +367,13 @@ namespace MarkdownDeep
 		// Remove the markdown escapes from a string
 		public static string UnescapeString(string str, bool ExtraMode)
 		{
-			if (str == null || str.IndexOf('\\') == -1)
+			if (str == null || str.IndexOf('\\')==-1)
 				return str;
 
 			var b = new StringBuilder();
 			for (int i = 0; i < str.Length; i++)
 			{
-				if (str[i] == '\\' && i + 1 < str.Length && IsEscapableChar(str[i + 1], ExtraMode))
+				if (str[i] == '\\' && i+1<str.Length && IsEscapableChar(str[i+1], ExtraMode))
 				{
 					b.Append(str[i + 1]);
 					i++;

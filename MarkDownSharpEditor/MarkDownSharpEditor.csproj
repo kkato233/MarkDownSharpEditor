@@ -109,6 +109,7 @@
     <Compile Include="AppSettings.cs" />
     <Compile Include="Azuki\AzukiExtentions.cs" />
     <Compile Include="Azuki\MarkdownHighlighter.cs" />
+    <Compile Include="MarkdonnDeep\StringProxy.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

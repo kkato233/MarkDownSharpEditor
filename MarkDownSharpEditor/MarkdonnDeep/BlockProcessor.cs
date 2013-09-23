@@ -35,10 +35,15 @@ namespace MarkdownDeep
 			m_parentType = parentType;
 		}
 
-		internal List<Block> Process(string str)
+		public List<Block> Process(string str)
 		{
 			return ScanLines(str);
 		}
+        public List<Block> Process(StringProxy s)
+        {
+            Reset(s);
+            return ScanLines();
+        }
 
 		internal List<Block> ScanLines(string str)
 		{
@@ -407,15 +412,18 @@ namespace MarkdownDeep
 			blocks.Clear();
 		}
 
-		internal string RenderLines(List<Block> lines)
+		internal StringProxy RenderLines(List<Block> lines)
 		{
-			StringBuilder b = m_markdown.GetStringBuilder();
+			//StringBuilder b = m_markdown.GetStringBuilder();
+            StringProxy b = new StringProxy();
 			foreach (var l in lines)
 			{
-				b.Append(l.buf, l.contentStart, l.contentLen);
-				b.Append('\n');
+				//b.Append(l.buf, l.contentStart, l.contentLen);
+                b.Append(l.proxy, l.contentStart, l.contentLen);
+				//b.Append('\n');
+                b.Append(StringProxy.Ln);
 			}
-			return b.ToString();
+			return b;
 		}
 
 		internal void CollapseLines(List<Block> blocks, List<Block> lines)
@@ -441,9 +449,11 @@ namespace MarkdownDeep
 					// Collapse all lines into a single paragraph
 					var para = CreateBlock();
 					para.blockType = BlockType.p;
-					para.buf = lines[0].buf;
-					para.contentStart = lines[0].contentStart;
+					//para.buf = lines[0].buf;
+                    para.proxy = lines[0].proxy;
+                    para.contentStart = lines[0].contentStart;
 					para.contentEnd = lines.Last().contentEnd;
+
 					blocks.Add(para);
 					FreeBlocks(lines);
 					break;
@@ -527,7 +537,8 @@ namespace MarkdownDeep
 
 			// Store line start
 			b.lineStart=position;
-			b.buf=input;
+			//b.buf=input;
+            b.proxy = this.proxy;
 
 			// Scan the line
 			b.contentStart = position;
@@ -654,7 +665,7 @@ namespace MarkdownDeep
 			}
 
 			// Fenced code blocks?
-			if (m_markdown.ExtraMode && (ch == '~' || ch == '`'))
+			if (m_markdown.ExtraMode && ch == '~')
 			{
 				if (ProcessFencedCodeBlock(b))
 					return b.blockType;
@@ -977,7 +988,9 @@ namespace MarkdownDeep
 								case MarkdownInHtmlMode.Span:
 								{
 									Block span = this.CreateBlock();
-									span.buf = input;
+									//span.buf = input;
+                                    span.proxy = this.proxy;
+
 									span.blockType = BlockType.span;
 									span.contentStart = inner_pos;
 									span.contentLen = tagpos - inner_pos;
@@ -1006,7 +1019,9 @@ namespace MarkdownDeep
 									else
 									{
 										Block span = this.CreateBlock();
-										span.buf = input;
+										//span.buf = input;
+                                        span.proxy = this.proxy;
+
 										span.blockType = BlockType.html;
 										span.contentStart = inner_pos;
 										span.contentLen = tagpos - inner_pos;
@@ -1142,7 +1157,9 @@ namespace MarkdownDeep
 							if (posStartCurrentTag > posStartPiece)
 							{
 								Block htmlBlock = this.CreateBlock();
-								htmlBlock.buf = input;
+								//htmlBlock.buf = input;
+                                htmlBlock.proxy = this.proxy;
+
 								htmlBlock.blockType = BlockType.html;
 								htmlBlock.contentStart = posStartPiece;
 								htmlBlock.contentLen = posStartCurrentTag - posStartPiece;
@@ -1192,7 +1209,9 @@ namespace MarkdownDeep
 								if (position > posStartPiece)
 								{
 									Block htmlBlock = this.CreateBlock();
-									htmlBlock.buf = input;
+									//htmlBlock.buf = input;
+                                    htmlBlock.proxy = this.proxy;
+
 									htmlBlock.blockType = BlockType.html;
 									htmlBlock.contentStart = posStartPiece;
 									htmlBlock.contentLen = position - posStartPiece;
@@ -1317,12 +1336,15 @@ namespace MarkdownDeep
 				{
 					// Build a new string containing all child items
 					bool bAnyBlanks = false;
-					StringBuilder sb = m_markdown.GetStringBuilder();
+					//StringBuilder sb = m_markdown.GetStringBuilder();
+                    StringProxy sb = new StringProxy();
 					for (int j = start_of_li; j <= end_of_li; j++)
 					{
 						var l = lines[j];
-						sb.Append(l.buf, l.contentStart, l.contentLen);
-						sb.Append('\n');
+						//sb.Append(l.buf, l.contentStart, l.contentLen);
+						//sb.Append('\n');
+                        sb.Append(l.proxy, l.contentStart, l.contentLen);
+                        sb.Append(StringProxy.Ln);
 
 						if (lines[j].blockType == BlockType.Blank)
 						{
@@ -1332,7 +1354,7 @@ namespace MarkdownDeep
 
 					// Create the item and process child blocks
 					var item = new Block(BlockType.li);
-					item.children = new BlockProcessor(m_markdown, m_bMarkdownInHtml, listType).Process(sb.ToString());
+					item.children = new BlockProcessor(m_markdown, m_bMarkdownInHtml, listType).Process(sb);
 
 					// If no blank lines, change all contained paragraphs to plain text
 					if (!bAnyBlanks)
@@ -1391,18 +1413,21 @@ namespace MarkdownDeep
 			}
 
 			// Build a new string containing all child items
-			StringBuilder sb = m_markdown.GetStringBuilder();
+			//StringBuilder sb = m_markdown.GetStringBuilder();
+            StringProxy sb = new StringProxy();
 			for (int i = 0; i < lines.Count; i++)
 			{
 				var l = lines[i];
-				sb.Append(l.buf, l.contentStart, l.contentLen);
-				sb.Append('\n');
+				//sb.Append(l.buf, l.contentStart, l.contentLen);
+				//sb.Append('\n');
+                sb.Append(l.proxy, l.contentStart, l.contentLen);
+                sb.Append(StringProxy.Ln);
 			}
 
 			// Create the item and process child blocks
 			var item = this.CreateBlock();
 			item.blockType = BlockType.dd;
-			item.children = new BlockProcessor(m_markdown, m_bMarkdownInHtml, BlockType.dd).Process(sb.ToString());
+			item.children = new BlockProcessor(m_markdown, m_bMarkdownInHtml, BlockType.dd).Process(sb);
 
 			FreeBlocks(lines);
 			lines.Clear();
@@ -1459,19 +1484,20 @@ namespace MarkdownDeep
 			}
 
 			// Build a new string containing all child items
-			StringBuilder sb = m_markdown.GetStringBuilder();
+			//StringBuilder sb = m_markdown.GetStringBuilder();
+            StringProxy sb = new StringProxy();
 			for (int i = 0; i < lines.Count; i++)
 			{
 				var l = lines[i];
-				sb.Append(l.buf, l.contentStart, l.contentLen);
-				sb.Append('\n');
+				sb.Append(l.proxy, l.contentStart, l.contentLen);
+				sb.Append(StringProxy.Ln);
 			}
 
 			// Create the item and process child blocks
 			var item = this.CreateBlock();
 			item.blockType = BlockType.footnote;
 			item.data = lines[0].data;
-			item.children = new BlockProcessor(m_markdown, m_bMarkdownInHtml, BlockType.footnote).Process(sb.ToString());
+			item.children = new BlockProcessor(m_markdown, m_bMarkdownInHtml, BlockType.footnote).Process(sb);
 
 			FreeBlocks(lines);
 			lines.Clear();
@@ -1484,7 +1510,7 @@ namespace MarkdownDeep
 		{
 			// Extract the fence
 			Mark();
-            while (current == '~' || current == '`')
+			while (current == '~')
 				SkipForward(1);
 			string strFence = Extract();
 
@@ -1492,16 +1518,10 @@ namespace MarkdownDeep
 			if (strFence.Length < 3)
 				return false;
 
-			// Skip a space if needed
+			// Rest of line must be blank
 			SkipLinespace();
-            var lang = string.Empty;
 			if (!eol)
-            {
-                // process language
-                Mark();
-                SkipToEol();
-                lang = Extract();
-            }
+				return false;
 
 			// Skip the eol and remember start of code
 			SkipEol();
@@ -1528,7 +1548,6 @@ namespace MarkdownDeep
 			// Create the code block
 			b.blockType = BlockType.codeblock;
 			b.children = new List<Block>();
-            b.codeBlockLang = lang;
 
 			// Remove the trailing line end
 			if (input[endCode - 1] == '\r' && input[endCode - 2] == '\n')
@@ -1541,7 +1560,9 @@ namespace MarkdownDeep
 			// Create the child block with the entire content
 			var child = CreateBlock();
 			child.blockType = BlockType.indent;
-			child.buf = input;
+			//child.buf = input;
+            child.proxy = this.proxy;
+
 			child.contentStart = startCode;
 			child.contentEnd = endCode;
 			b.children.Add(child);

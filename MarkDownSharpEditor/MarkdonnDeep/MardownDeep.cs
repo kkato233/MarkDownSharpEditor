@@ -826,7 +826,38 @@ namespace MarkdownDeep
 				p.SkipForward(1);
 			}
 		}
+        internal void HtmlEncode(StringBuilder dest, StringProxy str, int start, int len)
+        {
+            m_StringScanner.Reset(str, start, len);
+            var p = m_StringScanner;
+            while (!p.eof)
+            {
+                char ch = p.current;
+                switch (ch)
+                {
+                    case '&':
+                        dest.Append("&amp;");
+                        break;
 
+                    case '<':
+                        dest.Append("&lt;");
+                        break;
+
+                    case '>':
+                        dest.Append("&gt;");
+                        break;
+
+                    case '\"':
+                        dest.Append("&quot;");
+                        break;
+
+                    default:
+                        dest.Append(ch);
+                        break;
+                }
+                p.SkipForward(1);
+            }
+        }
 
 		// HtmlEncode a string, also converting tabs to spaces (used by CodeBlocks)
 		internal void HtmlEncodeAndConvertTabsToSpaces(StringBuilder dest, string str, int start, int len)

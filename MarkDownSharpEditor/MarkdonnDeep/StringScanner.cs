@@ -62,6 +62,27 @@ namespace MarkdownDeep
 			Reset(str, pos, str!=null ? str.Length - pos : 0);
 		}
 
+        public void Reset(StringProxy s)
+        {
+            this.proxy = s;
+            this.start = 0;
+            this.pos = 0;
+            this.end = proxy.Length;
+
+            _prev_pos = -1;
+        }
+        public void Reset(StringProxy s,int pos,int len)
+        {
+            this.proxy = s;
+            this.start = pos;
+            this.pos = pos;
+            this.end = pos + len;
+            
+            if (end > proxy.Length)
+                end = proxy.Length;
+
+            _prev_pos = -1;
+        }
 		// Reset
 		public void Reset(string str, int pos, int len)
 		{
@@ -74,13 +95,17 @@ namespace MarkdownDeep
 			if (pos > str.Length)
 				pos = str.Length;
 
-			this.str = str;
-			this.start = pos;
+			//this.str = str;
+            this.proxy = new StringProxy(str);
+
+            this.start = pos;
 			this.pos = pos;
 			this.end = pos + len;
 
 			if (end > str.Length)
 				end = str.Length;
+
+            _prev_pos = -1;
 		}
 
 		// Get the entire input string
@@ -97,12 +122,25 @@ namespace MarkdownDeep
 		{
 			get
 			{
-				if (pos < start || pos >= end)
-					return '\0';
-				else
-					return str[pos];
+                if (pos == _prev_pos) return _prev_char;
+
+                if (pos < start || pos >= end)
+                {
+                    _prev_pos = pos;
+                    _prev_char = '\0';
+                    return '\0';
+                }
+                else
+                {
+                    //return str[pos];
+                    _prev_char = proxy[pos];
+                    _prev_pos = pos;
+                    return _prev_char;
+                }
 			}
 		}
+        int _prev_pos = -1;
+        char _prev_char = '\0';
 
 		// Get/set the current position
 		public int position
@@ -139,7 +177,7 @@ namespace MarkdownDeep
 		{
 			while (pos < end)
 			{
-				char ch=str[pos];
+				char ch=proxy[pos];
 				if (ch=='\r' || ch=='\n')
 					break;
 				pos++;
@@ -151,11 +189,11 @@ namespace MarkdownDeep
 		{
 			if (pos < end)
 			{
-				char ch = str[pos];
+                char ch = proxy[pos];
 				if (ch == '\r')
 				{
 					pos++;
-					if (pos < end && str[pos] == '\n')
+                    if (pos < end && proxy[pos] == '\n')
 						pos++;
 					return true;
 				}
@@ -163,7 +201,7 @@ namespace MarkdownDeep
 				else if (ch == '\n')
 				{
 					pos++;
-					if (pos < end && str[pos] == '\r')
+                    if (pos < end && proxy[pos] == '\r')
 						pos++;
 					return true;
 				}
@@ -189,7 +227,9 @@ namespace MarkdownDeep
 				return '\0';
 			if (index >= end)
 				return '\0';
-			return str[index];
+			
+            //return str[index];
+            return proxy[index];
 		}
 
 		// Skip a number of characters
@@ -320,7 +360,8 @@ namespace MarkdownDeep
 		// Extract a substring
 		public string Substring(int start)
 		{
-			return str.Substring(start, end-start);
+			//return str.Substring(start, end-start);
+            return proxy.Substring(start, end - start).str;
 		}
 
 		// Extract a substring
@@ -329,7 +370,8 @@ namespace MarkdownDeep
 			if (start + len > end)
 				len = end - start;
 
-			return str.Substring(start, len);
+			//return str.Substring(start, len);
+            return proxy.Substring(start, len).str;
 		}
 
 		// Scan forward for a character
@@ -532,7 +574,16 @@ namespace MarkdownDeep
 		}
 
 		// Attributes
-		string str;
+
+        protected StringProxy proxy;
+
+		string str
+        {
+            get
+            {
+                return proxy.str;
+            }
+        }
 		int start;
 		int pos;
 		int end;

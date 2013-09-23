@@ -21,7 +21,7 @@ namespace MarkdownDeep
 {
 	// Some block types are only used during block parsing, some
 	// are only used during rendering and some are used during both
-	internal enum BlockType
+	public enum BlockType
 	{
 		Blank,			// blank line (parse only)
 		h1,				// headings (render and parse)
@@ -57,7 +57,7 @@ namespace MarkdownDeep
 		p_footnote,		// paragraph with footnote return link append.  Return link string is in `data`.
 	}
 
-    class ContentStartEndInfo
+    public class ContentStartEndInfo
     {
         public string buf;
         public int contentStart;
@@ -106,7 +106,7 @@ namespace MarkdownDeep
 #endif
     }
 
-	class Block
+	public class Block
 	{
 		internal Block()
 		{
@@ -301,7 +301,7 @@ namespace MarkdownDeep
                     if (m.RenderPos)
                     {
                         b.Append("<span ");
-                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'>");
                         b.Append("</span>");
                     }
 					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
@@ -319,7 +319,7 @@ namespace MarkdownDeep
 						b.Append("<" + blockType.ToString());
                         if (m.RenderPos)
                         {
-                            b.Append(" data-pos='" + contentStart.ToString() + "'");
+                            b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                         }
 						string id = ResolveHeaderID(m);
 						if (!String.IsNullOrEmpty(id))
@@ -345,7 +345,7 @@ namespace MarkdownDeep
                     b.Append("<hr ");
                     if (m.RenderPos)
                     {
-                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append("/>\n");
 					return;
@@ -358,7 +358,7 @@ namespace MarkdownDeep
                     b.Append("<li");
                     if (m.RenderPos)
                     {
-                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append(">");
 					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
@@ -403,7 +403,7 @@ namespace MarkdownDeep
                     b.Append("<dl");
                     if (m.RenderPos)
                     {
-                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append(">\n");
 					RenderChildren(m, b);
@@ -414,7 +414,7 @@ namespace MarkdownDeep
                     if (m.RenderPos)
                     {
                         b.Append("<span ");
-                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'>");
                         b.Append("</span>");
                     }
 					b.Append(buf, contentStart, contentLen);
@@ -424,7 +424,7 @@ namespace MarkdownDeep
                     if (m.RenderPos)
                     {
                         b.Append("<span ");
-                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'>");
                         b.Append("</span>");
                     }
 					m.HtmlEncode(b, buf, contentStart, contentLen);
@@ -436,7 +436,7 @@ namespace MarkdownDeep
                         if (m.RenderPos)
                         {
                             b.Append("<span ");
-                            b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                            b.Append(" data-pos='" + globalContentStart.ToString() + "'>");
                             b.Append("</span>");
                         }
 						var sb = new StringBuilder();
@@ -448,19 +448,13 @@ namespace MarkdownDeep
 						b.Append(m.FormatCodeBlock(m, sb.ToString()));
 					}
 					else
-                    {
-                        var attr = string.Empty;
-                        if (m.ExtraMode && !string.IsNullOrEmpty(this.codeBlockLang))
-                        {
-                            attr = string.Format(" class=\"{0}\"", this.codeBlockLang);
-                        }
+					{
                         b.Append("<pre");
                         if (m.RenderPos)
                         {
-                            b.Append(" data-pos='" + contentStart.ToString() + "'");
+                            b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                         }
-                        b.Append(">");
-                        b.Append(string.Format("<code{0}>", attr));
+                        b.Append("><code>");
 						foreach (var line in children)
 						{
 							m.HtmlEncodeAndConvertTabsToSpaces(b, line.buf, line.contentStart, line.contentLen);
@@ -474,7 +468,7 @@ namespace MarkdownDeep
                     b.Append("<blockquote");
                     if (m.RenderPos)
                     {
-                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append(">\n");
 					RenderChildren(m, b);
@@ -485,7 +479,7 @@ namespace MarkdownDeep
                     b.Append("<li");
                     if (m.RenderPos)
                     {
-                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append(">\n");
 					RenderChildren(m, b);
@@ -496,7 +490,7 @@ namespace MarkdownDeep
                     b.Append("<ol");
                     if (m.RenderPos)
                     {
-                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append(">\n");
 					RenderChildren(m, b);
@@ -517,7 +511,7 @@ namespace MarkdownDeep
                     if (m.RenderPos)
                     {
                         b.Append("<span ");
-                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'>");
                         b.Append("</span>");
                     }
 
@@ -550,7 +544,7 @@ namespace MarkdownDeep
                     if (m.RenderPos)
                     {
                         b.Append("<span ");
-                        b.Append(" data-pos='" + contentStart.ToString() + "'>");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'>");
                         b.Append("</span>");
                     }
 					((TableSpec)data).Render(m, b);
@@ -560,7 +554,7 @@ namespace MarkdownDeep
                     b.Append("<p");
                     if (m.RenderPos)
                     {
-                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append(">");
 					if (contentLen > 0)
@@ -576,7 +570,7 @@ namespace MarkdownDeep
                     b.Append("<" + blockType.ToString());
                     if (m.RenderPos)
                     {
-                        b.Append(" data-pos='" + contentStart.ToString() + "'");
+                        b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append(">");
 					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
@@ -719,7 +713,8 @@ namespace MarkdownDeep
 		public Block CopyFrom(Block other)
 		{
 			blockType = other.blockType;
-			buf = other.buf;
+			// buf = other.buf;
+            proxy = other.proxy;
 			contentStart = other.contentStart;
 			contentLen = other.contentLen;
 			lineStart = other.lineStart;
@@ -727,8 +722,31 @@ namespace MarkdownDeep
 			return this;
 		}
 
-		internal BlockType blockType;
-		internal string buf;
+		public BlockType blockType;
+
+        internal StringProxy proxy;
+        internal string buf
+        {
+            get
+            {
+                if (proxy == null) return null;
+                return proxy.str;
+            }
+        }
+        public int globalContentStart
+        {
+            get
+            {
+                if (proxy != null)
+                {
+                    return proxy.LocalPosToGlobalPos(contentStart);
+                }
+                else
+                {
+                    return contentStart;
+                }
+            }
+        }
 		internal int contentStart;
 		internal int contentLen;
 		internal int lineStart;
@@ -810,7 +828,6 @@ namespace MarkdownDeep
             }
         }
         WeakReference _parent;
-        internal string codeBlockLang;
 	}
 
 }

@@ -140,9 +140,9 @@ namespace MarkDownSharpEditor.Azuki
 
         internal void Select(int selectStart, int selectLength)
         {
-            if (SelectionStart > ctrl.Document.Length)
+            if (selectStart > ctrl.Document.Length)
             {
-                SelectionStart = ctrl.Document.Length;
+                selectStart = ctrl.Document.Length;
             }
             int selectEnd = selectStart + selectLength;
             if (selectEnd > ctrl.Document.Length)

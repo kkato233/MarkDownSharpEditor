@@ -1659,9 +1659,12 @@ namespace MarkDownSharpEditor
             while (dataPos <= 0 && elem != null)
             {
                 elem = elem.Parent;
+                if (elem == null) break;
+
+                dataPos = GetDataPos(elem);
             }
 
-            if (dataPos > 20)
+            if (dataPos > 5)
             {
                 // まだ完ぺきに data-pos の値が設定できていないので・・仕方ないが・・
 

@@ -913,13 +913,13 @@ namespace MarkdownDeep
 			}
 		}
 
-		internal string MakeUniqueHeaderID(string strHeaderText)
+        internal string MakeUniqueHeaderID(StringProxy strHeaderText)
 		{
 			return MakeUniqueHeaderID(strHeaderText, 0, strHeaderText.Length);
 
 		}
 
-		internal string MakeUniqueHeaderID(string strHeaderText, int startOffset, int length)
+		internal string MakeUniqueHeaderID(StringProxy strHeaderText, int startOffset, int length)
 		{
 			if (!AutoHeadingIDs)
 				return null;

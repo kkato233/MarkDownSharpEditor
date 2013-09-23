@@ -30,7 +30,7 @@ namespace MarkdownDeep
 		}
 
 
-		internal void FormatParagraph(StringBuilder dest, string str, int start, int len, int offset,bool renderPos)
+		internal void FormatParagraph(StringBuilder dest, StringProxy str, int start, int len, int offset,bool renderPos)
 		{
 			// Parse the string into a list of tokens
 			Tokenize(str, start, len);
@@ -73,7 +73,7 @@ namespace MarkdownDeep
 				dest.Append("<p");
                 if (renderPos)
                 {
-                    int pos = this.proxy.LocalPosToGlobalPos(start + offset);
+                    int? pos = this.proxy.LocalPosToGlobalPos(start + offset);
                     dest.Append(" data-pos='" + pos.ToString() + "'");
                     //dest.Append(" contenteditable='true'");
                 }
@@ -83,13 +83,13 @@ namespace MarkdownDeep
 			}
 		}
 
-		internal void Format(StringBuilder dest, string str)
+		internal void Format(StringBuilder dest, StringProxy str)
 		{
 			Format(dest, str, 0, str.Length);
 		}
 
 		// Format a range in an input string and write it to the destination string builder.
-		internal void Format(StringBuilder dest, string str, int start, int len)
+		internal void Format(StringBuilder dest, StringProxy str, int start, int len)
 		{
 			// Parse the string into a list of tokens
 			Tokenize(str, start, len);
@@ -98,7 +98,7 @@ namespace MarkdownDeep
 			Render(dest, str);
 		}
 
-		internal void FormatPlain(StringBuilder dest, string str, int start, int len)
+		internal void FormatPlain(StringBuilder dest, StringProxy str, int start, int len)
 		{
 			// Parse the string into a list of tokens
 			Tokenize(str, start, len);
@@ -109,36 +109,37 @@ namespace MarkdownDeep
 
 		// Format a string and return it as a new string
 		// (used in formatting the text of links)
-		internal string Format(string str)
+		internal string Format(StringProxy str)
 		{
 			StringBuilder dest = new StringBuilder();
 			Format(dest, str, 0, str.Length);
 			return dest.ToString();
 		}
 
-		internal string MakeID(string str)
+		internal string MakeID(StringProxy str)
 		{
 			return MakeID(str, 0, str.Length);
 		}
 
-		internal string MakeID(string str, int start, int len)
+		internal string MakeID(StringProxy str, int start, int len)
 		{
 			// Parse the string into a list of tokens
 			Tokenize(str, start, len);
 	
-			StringBuilder sb = new StringBuilder();
+			//StringBuilder sb = new StringBuilder();
+            StringProxy sbx = new StringProxy();
 
 			foreach (var t in m_Tokens)
 			{
 				switch (t.type)
 				{
 					case TokenType.Text:
-						sb.Append(str, t.startOffset, t.length);
+						sbx.Append(str, t.startOffset, t.length);
 						break;
 
 					case TokenType.link:
 						LinkInfo li = (LinkInfo)t.data;
-						sb.Append(li.link_text);
+						sbx.Append(new StringProxy(li.link_text,Literal:true));
 						break;
 				}
 
@@ -146,7 +147,7 @@ namespace MarkdownDeep
 			}
 
 			// Now clean it using the same rules as pandoc
-			base.Reset(sb.ToString());
+			base.Reset(sbx);
 
 			// Skip everything up to the first letter
 			while (!eof)
@@ -157,7 +158,7 @@ namespace MarkdownDeep
 			}
 
 			// Process all characters
-			sb.Length = 0;
+            StringBuilder sb = new StringBuilder();
 			while (!eof)
 			{
 				char ch = current;
@@ -179,7 +180,7 @@ namespace MarkdownDeep
 		}
 
 		// Render a list of tokens to a destinatino string builder.
-		private void Render(StringBuilder sb, string str)
+		private void Render(StringBuilder sb, StringProxy proxy)
 		{
 			foreach (Token t in m_Tokens)
 			{
@@ -187,12 +188,12 @@ namespace MarkdownDeep
 				{
 					case TokenType.Text:
 						// Append encoded text
-						m_Markdown.HtmlEncode(sb, str, t.startOffset, t.length);
+						m_Markdown.HtmlEncode(sb, proxy, t.startOffset, t.length);
 						break;
 
 					case TokenType.HtmlTag:
 						// Append html as is
-						Utils.SmartHtmlEncodeAmps(sb, str, t.startOffset, t.length);
+						Utils.SmartHtmlEncodeAmps(sb, proxy.str, t.startOffset, t.length);
 						break;
 
 					case TokenType.Html:
@@ -200,7 +201,7 @@ namespace MarkdownDeep
 					case TokenType.closing_mark:
 					case TokenType.internal_mark:
 						// Append html as is
-						sb.Append(str, t.startOffset, t.length);
+						sb.Append(proxy.str, t.startOffset, t.length);
 						break;
 
 					case TokenType.br:
@@ -225,7 +226,7 @@ namespace MarkdownDeep
 
 					case TokenType.code_span:
 						sb.Append("<code>");
-						m_Markdown.HtmlEncode(sb, str, t.startOffset, t.length);
+						m_Markdown.HtmlEncode(sb, proxy, t.startOffset, t.length);
 						sb.Append("</code>");
 						break;
 
@@ -235,7 +236,7 @@ namespace MarkdownDeep
 						var sf = new SpanFormatter(m_Markdown);
 						sf.DisableLinks = true;
 
-						li.def.RenderLink(m_Markdown, sb, sf.Format(li.link_text));
+						li.def.RenderLink(m_Markdown, sb, sf.Format(new StringProxy(li.link_text,Literal:true)));
 						break;
 					}
 
@@ -281,14 +282,14 @@ namespace MarkdownDeep
 		}
 
 		// Render a list of tokens to a destinatino string builder.
-		private void RenderPlain(StringBuilder sb, string str)
+		private void RenderPlain(StringBuilder sb, StringProxy str)
 		{
 			foreach (Token t in m_Tokens)
 			{
 				switch (t.type)
 				{
 					case TokenType.Text:
-						sb.Append(str, t.startOffset, t.length);
+						sb.Append(str.str, t.startOffset, t.length);
 						break;
 
 					case TokenType.HtmlTag:
@@ -310,7 +311,7 @@ namespace MarkdownDeep
 						break;
 
 					case TokenType.code_span:
-						sb.Append(str, t.startOffset, t.length);
+						sb.Append(str.str, t.startOffset, t.length);
 						break;
 
 					case TokenType.link:
@@ -337,7 +338,7 @@ namespace MarkdownDeep
 		}
 
 		// Scan the input string, creating tokens for anything special 
-		public void Tokenize(string str, int start, int len)
+		public void Tokenize(StringProxy str, int start, int len)
 		{
 			// Prepare
 			base.Reset(str, start, len);

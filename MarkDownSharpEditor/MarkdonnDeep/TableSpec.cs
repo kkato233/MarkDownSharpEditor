@@ -37,10 +37,10 @@ namespace MarkdownDeep
 
 		public List<ColumnAlignment> Columns=new List<ColumnAlignment>();
 
-		public List<string> Headers;
-		public List<List<string>> Rows=new List<List<string>>();
+		public List<StringProxy> Headers;
+        public List<List<StringProxy>> Rows = new List<List<StringProxy>>();
 
-		public List<string> ParseRow(StringScanner p)
+		public List<StringProxy> ParseRow(StringScanner p)
 		{
 			p.SkipLinespace();
 
@@ -54,7 +54,7 @@ namespace MarkdownDeep
 			}
 
 			// Create the row
-			List<string> row = new List<string>();
+            List<StringProxy> row = new List<StringProxy>();
 
 			// Parse all columns except the last
 
@@ -65,7 +65,7 @@ namespace MarkdownDeep
 				while (!p.eol && p.current != '|')
 					p.SkipForward(1);
 
-				row.Add(p.Extract().Trim());
+                row.Add(p.ExtractProxy().Trim());
 
 				bAnyBars|=p.SkipChar('|');
 			}
@@ -77,14 +77,14 @@ namespace MarkdownDeep
 			// Add missing columns
 			while (row.Count < Columns.Count)
 			{
-				row.Add("&nbsp;");
+				row.Add(new StringProxy("&nbsp;",Literal:true));
 			}
 
 			p.SkipEol();
 			return row;
 		}
 
-		internal void RenderRow(Markdown m, StringBuilder b, List<string> row, string type)
+		internal void RenderRow(Markdown m, StringBuilder b, List<StringProxy> row, string type)
 		{
 			for (int i=0; i<row.Count; i++)
 			{

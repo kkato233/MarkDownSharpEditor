@@ -11,7 +11,16 @@ namespace MarkdownDeep
     public class StringProxy
     {
         public StringBuilder baseString;
-        
+
+        public bool IsLiteral
+        {
+            get
+            {
+                return _literal;
+            }
+        }
+        protected bool _literal = false;
+
         public StringProxy()
         {
             segments = new List<StringSegment>();
@@ -30,6 +39,24 @@ namespace MarkdownDeep
                 length = s.Length,
                 sb = baseString,
             });
+        }
+
+        /// <summary>
+        /// もとになる文字列を指定したコンストラクタ
+        /// </summary>
+        /// <param name="s"></param>
+        public StringProxy(string s,bool Literal)
+        {
+            baseString = new StringBuilder(s);
+            segments.Add(new StringSegment()
+            {
+                start = 0,
+                length = s.Length,
+                sb = baseString,
+                isLiteral = Literal,
+            });
+
+            this._literal = Literal;
         }
 
         /// <summary>
@@ -170,6 +197,7 @@ namespace MarkdownDeep
             {
                 this.baseString = addItem.baseString;
             }
+#if false
             else if (addItem.baseString == LnString)
             {
                 // チェック不要
@@ -178,7 +206,7 @@ namespace MarkdownDeep
             {
                 throw new InvalidOperationException("基準となる文字列が違う場合は連結できません。");
             }
-
+#endif
             // 状態クリア
             InitStr();
             
@@ -209,12 +237,14 @@ namespace MarkdownDeep
             StringSegment item = new StringSegment();
             item.sb = this.baseString;
             item.start = segments[i].start + skip;
+            item.isLiteral = this._literal;
             int ll = segments[i].length - skip;
             while(ll < length) {
                 item.length = ll;
                 length = length - ll;
                 ans.Add(item);
                 item = new StringSegment();
+                item.isLiteral = this._literal;
                 item.sb = this.baseString;
                 i++;
                 item.start = segments[i].start;
@@ -226,37 +256,78 @@ namespace MarkdownDeep
             return ans;
         }
 
-        public int LocalPosToGlobalPos(int pos)
+        public int ?LocalPosToGlobalPos(int pos)
         {
             foreach (var item in segments)
             {
                 for (int i = 0; i < item.length; i++)
                 {
                     pos--;
-                    if (pos <= 0)
+                    if (pos <= 0 && item.isLiteral == false)
                     {
                         return item.start + i;
                     }
                 }
             }
 
-            throw new InvalidOperationException("パラメータの指定に問題があります。");
+            return null;
         }
 
         protected List<StringSegment> segments = new List<StringSegment>();
 
         static StringBuilder LnString = new StringBuilder("\n");
+        static StringBuilder EmptyString = new StringBuilder("");
 
         /// <summary>
         /// 改行だけのセグメント
         /// </summary>
         public static StringProxy Ln = new StringProxyLn(LnString);
 
+        /// <summary>
+        /// 空文字列
+        /// </summary>
+        public static StringProxy Empty = new StringProxyLn(EmptyString);
+
         public override string ToString()
         {
             return base.ToString();
         }
 
+        /// <summary>
+        /// トリミングした新しい文字列を作成する
+        /// </summary>
+        /// <returns></returns>
+        public StringProxy Trim()
+        {
+            // TrimStart
+            int skip = 0;
+            while (skip < this.Length)
+            {
+                char c = this[skip];
+                if (char.IsWhiteSpace(c))
+                {
+                    skip++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            // TrimEnd
+            int len = this.Length - skip;
+            while (len > 0)
+            {
+                char c = this[skip + len];
+                if (char.IsWhiteSpace(c))
+                {
+                    len = len - 1;
+                } else {
+                    break;
+                }
+            }
+
+            return this.Substring(skip, len);
+        }
     }
 
     internal class StringProxyLn : StringProxy
@@ -274,11 +345,13 @@ namespace MarkdownDeep
         public StringProxyLn(StringBuilder sb)
         {
             this.baseString = sb;
+            this._literal = true;
             segments.Add(new StringSegment()
             {
                 sb = this.baseString,
                 start = 0,
                 length = sb.Length,
+                isLiteral = true,
             });
         }
 
@@ -293,5 +366,6 @@ namespace MarkdownDeep
         public int start;
         public int length;
         public StringBuilder sb;
+        public bool isLiteral;
     }
 }

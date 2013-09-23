@@ -476,6 +476,14 @@ namespace MarkdownDeep
 			return str.Substring(mark, pos - mark);
 		}
 
+        public StringProxy ExtractProxy()
+        {
+            if (mark >= pos)
+                return StringProxy.Empty;
+
+            return proxy.Substring(mark, pos - mark);
+        }
+
 		// Skip an identifier
 		public bool SkipIdentifier(ref string identifier)
 		{

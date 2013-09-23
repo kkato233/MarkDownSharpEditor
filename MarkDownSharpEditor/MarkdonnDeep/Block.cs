@@ -122,20 +122,15 @@ namespace MarkdownDeep
         /// Content.Split('\n') の代用品として利用する
         /// </summary>
         /// <returns></returns>
-        public List<ContentStartEndInfo> ContentSplitLines()
+        public List<StringProxy> ContentSplitLines()
         {
-            List<ContentStartEndInfo> ans = new List<ContentStartEndInfo>();
+            List<StringProxy> ans = new List<StringProxy>();
 
             if (blockType == BlockType.codeblock)
             {
                 foreach (var line in children)
                 {
-                    ans.Add(new ContentStartEndInfo()
-                    {
-                       buf = line.buf,
-                       contentStart = line.contentStart,
-                       contentLen = line.contentLen,
-                    });
+                    ans.Add(line.proxy.Substring(line.contentStart,line.contentLen));
                 }
 #if DEBUG
                 CheckContentSplit(ans);
@@ -154,12 +149,7 @@ namespace MarkdownDeep
                 int findPos = buf.IndexOf('\n', startPos);
                 while (findPos >= 0 && findPos < endPos )
                 {
-                    ans.Add(new ContentStartEndInfo()
-                    {
-                        buf = buf,
-                        contentStart = contentStart,
-                        contentLen = findPos - startPos,
-                    });
+                    ans.Add(proxy.Substring(contentStart,findPos - startPos));
 
                     startPos = findPos + 1;
                     findPos = buf.IndexOf('\n', startPos);
@@ -168,12 +158,7 @@ namespace MarkdownDeep
                 // 残りの部分を登録する
                 if (startPos < endPos)
                 {
-                    ans.Add(new ContentStartEndInfo()
-                    {
-                        buf = buf,
-                        contentStart = startPos,
-                        contentLen = contentStart + contentLen - startPos,
-                    });
+                    ans.Add(proxy.Substring(startPos,contentStart + contentLen - startPos));
                 }
 #if DEBUG
                 CheckContentSplit(ans);
@@ -183,7 +168,7 @@ namespace MarkdownDeep
         }
 
 #if DEBUG
-        private void CheckContentSplit(List<ContentStartEndInfo> cList)
+        private void CheckContentSplit(List<StringProxy> cList)
         {
             List<string> list = new List<string>();
             foreach (var l in Content.Split('\n'))
@@ -194,7 +179,7 @@ namespace MarkdownDeep
 
             foreach (var c in cList)
             {
-                list2.Add(c.Content);
+                list2.Add(c.str);
             }
 
             System.Diagnostics.Debug.Assert(list.Count == list2.Count);
@@ -268,7 +253,7 @@ namespace MarkdownDeep
 			else
 			{
 				// Approach 2 - pandoc style header id
-				id = m.MakeUniqueHeaderID(buf, contentStart, contentLen);
+				id = m.MakeUniqueHeaderID(proxy, contentStart, contentLen);
 			}
 
 			this.data = id;
@@ -294,8 +279,7 @@ namespace MarkdownDeep
                             offset = this.ParentBlock.contentStart;
                         }
 
-                        // TODO: この buf に proxy を渡して オリジナルの文字列の位置を子要素に伝えるように改造する
-                        m.SpanFormatter.FormatParagraph(b, buf, contentStart, contentLen, offset, m.RenderPos);
+                        m.SpanFormatter.FormatParagraph(b, proxy, contentStart, contentLen, offset, m.RenderPos);
                     }
 					break;
 
@@ -306,7 +290,7 @@ namespace MarkdownDeep
                         b.Append(" data-pos='" + globalContentStart.ToString() + "'>");
                         b.Append("</span>");
                     }
-					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
+					m.SpanFormatter.Format(b, proxy, contentStart, contentLen);
 					b.Append("\n");
 					break;
 
@@ -339,7 +323,7 @@ namespace MarkdownDeep
 					{
 						b.Append("<" + blockType.ToString() + ">");
 					}
-					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
+					m.SpanFormatter.Format(b, proxy, contentStart, contentLen);
 					b.Append("</" + blockType.ToString() + ">\n");
 					break;
 
@@ -363,7 +347,7 @@ namespace MarkdownDeep
                         b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append(">");
-					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
+					m.SpanFormatter.Format(b, proxy, contentStart, contentLen);
 					b.Append("</li>\n");
 					break;
 
@@ -375,7 +359,7 @@ namespace MarkdownDeep
 						RenderChildren(m, b);
 					}
 					else
-						m.SpanFormatter.Format(b, buf, contentStart, contentLen);
+                        m.SpanFormatter.Format(b, proxy, contentStart, contentLen);
 					b.Append("</dd>\n");
 					break;
 
@@ -388,7 +372,7 @@ namespace MarkdownDeep
 						{
 							b.Append("<dt>");
                                 //m.SpanFormatter.Format(b, l.Trim());
-                                m.SpanFormatter.Format(b, c.buf, c.contentStart, c.contentLen);
+                                m.SpanFormatter.Format(b, c);
 							b.Append("</dt>\n");
 						}
 					}
@@ -454,7 +438,10 @@ namespace MarkdownDeep
                         b.Append("<pre");
                         if (m.RenderPos)
                         {
-                            b.Append(" data-pos='" + globalContentStart.ToString() + "'");
+                            if (children.Any())
+                            {
+                                b.Append(" data-pos='" + children.First().globalContentStart.ToString() + "'");
+                            }
                         }
                         b.Append("><code>");
 						foreach (var line in children)
@@ -561,7 +548,7 @@ namespace MarkdownDeep
                     b.Append(">");
 					if (contentLen > 0)
 					{
-						m.SpanFormatter.Format(b, buf, contentStart, contentLen);
+						m.SpanFormatter.Format(b, proxy, contentStart, contentLen);
 						b.Append("&nbsp;");
 					}
 					b.Append((string)data);
@@ -575,7 +562,7 @@ namespace MarkdownDeep
                         b.Append(" data-pos='" + globalContentStart.ToString() + "'");
                     }
                     b.Append(">");
-					m.SpanFormatter.Format(b, buf, contentStart, contentLen);
+                    m.SpanFormatter.Format(b, proxy, contentStart, contentLen);
 					b.Append("</" + blockType.ToString() + ">\n");
 					break;
 			}
@@ -590,7 +577,7 @@ namespace MarkdownDeep
 
 				case BlockType.p:
 				case BlockType.span:
-					m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen);
+					m.SpanFormatter.FormatPlain(b, proxy, contentStart, contentLen);
 					b.Append(" ");
 					break;
 
@@ -600,7 +587,7 @@ namespace MarkdownDeep
 				case BlockType.h4:
 				case BlockType.h5:
 				case BlockType.h6:
-					m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen);
+					m.SpanFormatter.FormatPlain(b, proxy, contentStart, contentLen);
 					b.Append(" - ");
 					break;
 
@@ -608,7 +595,7 @@ namespace MarkdownDeep
 				case BlockType.ol_li:
 				case BlockType.ul_li:
 					b.Append("* ");
-					m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen);
+					m.SpanFormatter.FormatPlain(b, proxy, contentStart, contentLen);
 					b.Append(" ");
 					break;
 
@@ -619,7 +606,7 @@ namespace MarkdownDeep
 						RenderChildrenPlain(m, b);
 					}
 					else
-						m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen);
+                        m.SpanFormatter.FormatPlain(b, proxy, contentStart, contentLen);
 					break;
 
 				case BlockType.dt:
@@ -632,7 +619,7 @@ namespace MarkdownDeep
 								//var str = l.Trim();
                                 c.Trim();
 								//m.SpanFormatter.FormatPlain(b, str, 0, str.Length);
-                                m.SpanFormatter.Format(b, c.buf, c.contentStart, c.contentLen);
+                                m.SpanFormatter.Format(b, c);
 							}
 						}
 						else
@@ -741,7 +728,7 @@ namespace MarkdownDeep
             {
                 if (proxy != null)
                 {
-                    return proxy.LocalPosToGlobalPos(contentStart);
+                    return proxy.LocalPosToGlobalPos(contentStart) ?? contentStart;
                 }
                 else
                 {

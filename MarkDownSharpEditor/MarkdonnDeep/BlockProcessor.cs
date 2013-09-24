@@ -665,7 +665,7 @@ namespace MarkdownDeep
 			}
 
 			// Fenced code blocks?
-			if (m_markdown.ExtraMode && ch == '~')
+            if (m_markdown.ExtraMode && (ch == '~' || ch == '`'))
 			{
 				if (ProcessFencedCodeBlock(b))
 					return b.blockType;
@@ -1510,7 +1510,7 @@ namespace MarkdownDeep
 		{
 			// Extract the fence
 			Mark();
-			while (current == '~')
+            while (current == '~' || current == '`')
 				SkipForward(1);
 			string strFence = Extract();
 
@@ -1518,10 +1518,16 @@ namespace MarkdownDeep
 			if (strFence.Length < 3)
 				return false;
 
-			// Rest of line must be blank
+            // Skip a space if needed
 			SkipLinespace();
+            var lang = string.Empty;
 			if (!eol)
-				return false;
+			{
+                // process language
+                Mark();
+                SkipToEol();
+                lang = Extract();
+            }
 
 			// Skip the eol and remember start of code
 			SkipEol();
@@ -1548,6 +1554,7 @@ namespace MarkdownDeep
 			// Create the code block
 			b.blockType = BlockType.codeblock;
 			b.children = new List<Block>();
+            b.codeBlockLang = lang;
 
 			// Remove the trailing line end
 			if (input[endCode - 1] == '\r' && input[endCode - 2] == '\n')

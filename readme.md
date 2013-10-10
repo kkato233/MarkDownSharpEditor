@@ -1,4 +1,4 @@
-# MarkDown#Editor azuki ブランチ
+# MarkDown#Editor (dev-azuki ブランチ)
 ===================================
 RichTextBox を使うと非常に遅いので、Markdown のシンタックスハイライトが異常に遅いので Azuki テキスト入力コンポーネントに置き換えたバージョン
 

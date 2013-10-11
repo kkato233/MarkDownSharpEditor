@@ -108,6 +108,7 @@
     <Compile Include="AppHistory.cs" />
     <Compile Include="AppSettings.cs" />
     <Compile Include="Azuki\AzukiExtentions.cs" />
+    <Compile Include="Azuki\EncodingAnalyzer.cs" />
     <Compile Include="Azuki\MarkdownHighlighter.cs" />
     <Compile Include="MarkdonnDeep\StringProxy.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
@@ -120,6 +121,7 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.ja-JP.resx</DependentUpon>
     </Compile>
+    <Compile Include="smplehtmlparser\HtmlParser.cs" />
     <Compile Include="SyntaxColorScheme.cs" />
     <Compile Include="MarkdonnDeep\Abbreviation.cs" />
     <Compile Include="MarkdonnDeep\Block.cs" />

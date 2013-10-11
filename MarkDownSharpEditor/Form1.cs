@@ -970,6 +970,7 @@ namespace MarkDownSharpEditor
 			//Detect encoding
 			if (_fNoTitle == false)
 			{
+#if false
 				byte[] bs;
 				using (FileStream fs = new FileStream(FilePath, FileMode.Open, FileAccess.Read))
 				{
@@ -979,7 +980,10 @@ namespace MarkDownSharpEditor
 				//文字コードを取得する
 				//Get charcter encoding
 				_EditingFileEncoding = GetCode(bs);
-			}
+#else
+                _EditingFileEncoding = Sgry.EncodingAnalyzer.Analyze(FilePath);
+#endif
+            }
 			else
 			{
 				//「無題」はデフォルトのエンコーディング
@@ -1311,6 +1315,8 @@ namespace MarkDownSharpEditor
 				}
 			}
 #endif
+
+#if false
             //エンコーディングしつつbyte値に変換する（richEditBoxは基本的にutf-8 = 65001）
 			//Encode and convert it to 'byte' value ( richEditBox default encoding is utf-8 = 65001 )
 			byte[] bytesData = Encoding.GetEncoding(CodePageNum).GetBytes(MkResultText);
@@ -1343,8 +1349,38 @@ namespace MarkDownSharpEditor
 				ResultText = Encoding.GetEncoding(CodePageNum).GetString(bytesData);
 				e.Result = ResultText;
 			}
+#else
+            // ファイルに保存するのではなく 画像の相対パスを絶対パスに書き換える
+            if (ResultText.Contains("<img") && string.IsNullOrEmpty(_MarkDownTextFilePath) == false)
+            {
+                Uri baseURI = new Uri("file://" + _MarkDownTextFilePath, UriKind.Absolute);
+                HtmlTools.HtmlParser parser = new HtmlTools.HtmlParser();
+                var dom = parser.ParseHtmlString(ResultText);
 
-		}
+                int changeCount = 0;
+                foreach (var img in dom.GetElementsByTagName("img"))
+                {
+                    string src = img.GetAttribute("src");
+                    if (string.IsNullOrEmpty(src) == false)
+                    {
+                        Uri url = new Uri(baseURI, relativeUri: src);
+                        if (url.AbsoluteUri != src)
+                        {
+                            img.SetAttributes("src", url.AbsoluteUri);
+                            changeCount++;
+                        }
+                    }
+                }
+                if (changeCount > 0)
+                {
+                    ResultText = dom.ToHtmlString();
+                }
+            }
+
+            e.Result = ResultText;
+#endif
+
+        }
 
 		private void backgroundWorker1_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
 		{
@@ -1373,8 +1409,13 @@ namespace MarkDownSharpEditor
 					}
 					//-----------------------------------
                     System.Threading.Tasks.Task waitTask;
+
+#if false
 					if (_fNoTitle == false)
-					{
+#else
+                    if (false)  // 一時ファイルを使って開く方法は使わない
+#endif
+                    {
 						//ナビゲート
 						//Browser navigate
 						//webBrowser1.Navigate(@"file://" + (string)e.Result);
@@ -1391,7 +1432,8 @@ namespace MarkDownSharpEditor
 						//"Associated web browser" in toolbar is invalid
 						toolStripButtonBrowserPreview.Enabled = false;
 					}
-					//-----------------------------------
+
+                    //-----------------------------------
 					//スクロールバーの位置を復帰する
 					//Restore scroll bar position
 					if (doc != null)
@@ -2141,6 +2183,7 @@ namespace MarkDownSharpEditor
 			{
 				//テキストファイルを開いてその文字コードに従って読み込み
 				//Detect encoding in the text file
+#if false
 				byte[] bs;
 				using (FileStream fs = new FileStream(FilePath, FileMode.Open, FileAccess.Read))
 				{
@@ -2160,6 +2203,13 @@ namespace MarkDownSharpEditor
 				{
 					ResultText = ConvertStringToEncoding(ResultText, encRead.CodePage, CodePageNum);
 				}
+#else
+                encRead = Sgry.EncodingAnalyzer.Analyze(FilePath);
+                using (System.IO.StreamReader sr = new StreamReader(FilePath, encRead))
+                {
+                    ResultText = sr.ReadToEnd();
+                }
+#endif
 				ResultText = mkdwn.Transform(ResultText);
 			}
 

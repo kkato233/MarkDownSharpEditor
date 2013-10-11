@@ -1060,6 +1060,9 @@ namespace MarkDownSharpEditor
 			richTextBox1.SelectionStart = 0;
 			richTextBox1.EndUpdate();
 
+            // 先頭に移動
+            richTextBox1.ScrollToCaret();
+
 			//変更フラグOFF
 			richTextBox1.Modified = false;
 

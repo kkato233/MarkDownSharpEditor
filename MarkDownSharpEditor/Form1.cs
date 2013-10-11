@@ -1297,7 +1297,9 @@ namespace MarkDownSharpEditor
 			string OneLine;
 			StringReader sr = new StringReader(ResultText);
 			StringWriter sw = new StringWriter();
-			while ((OneLine = sr.ReadLine()) != null)
+
+#if false // 副作用が多いのでコメントアウト
+            while ((OneLine = sr.ReadLine()) != null)
 			{
 				if (OneLine.IndexOf("<!-- edit -->") >= 0)
 				{
@@ -1308,8 +1310,8 @@ namespace MarkDownSharpEditor
 					MkResultText += (OneLine + "\n");
 				}
 			}
-
-			//エンコーディングしつつbyte値に変換する（richEditBoxは基本的にutf-8 = 65001）
+#endif
+            //エンコーディングしつつbyte値に変換する（richEditBoxは基本的にutf-8 = 65001）
 			//Encode and convert it to 'byte' value ( richEditBox default encoding is utf-8 = 65001 )
 			byte[] bytesData = Encoding.GetEncoding(CodePageNum).GetBytes(MkResultText);
 

@@ -43,6 +43,7 @@ namespace MarkdownDeep
 			m_Footnotes = new Dictionary<string, Block>();
 			m_UsedFootnotes = new List<Block>();
 			m_UsedHeaderIDs = new Dictionary<string, bool>();
+			GfmOptions = new GitFlavoredMarkdownOptions();
 		}
 
         /// <summary>
@@ -230,6 +231,15 @@ namespace MarkdownDeep
 		//  - Abbreviations
 		//  - Simple tables
 		public bool ExtraMode
+		{
+			get;
+			set;
+		}
+
+		// Set to true to enable GitFlavoredMarkdownMode, which enables some
+		// of the Git Flavored Markdown features.
+		//  - 
+		public GitFlavoredMarkdownOptions GfmOptions
 		{
 			get;
 			set;
@@ -1017,4 +1027,29 @@ namespace MarkdownDeep
 	
 	}
 
+	/// <summary>
+	/// A set of options to enable specific Git Flavored Markdown features.
+	/// </summary>
+	public class GitFlavoredMarkdownOptions
+	{
+		/// <summary>
+		/// Plain old newlines at the end of a line cause a Markdown line break.
+		/// </summary>
+		public bool Linebreaks { get; set; }
+
+		/// <summary>
+		/// Enable [[Link]] links, where "Link" is the text and the url.
+		/// </summary>
+		public bool DoubleSquareBracketLinks { get; set; }
+
+		/// <summary>
+		/// Convert spaces to dashes in links: [[hello world]] becomes [hello world](hello-world)
+		/// </summary>
+		public bool SpacesInLinks { get; set; }
+
+		/// <summary>
+		/// Convert [[image.png]] (or .gif or .jpg) to ![image](image.png)
+		/// </summary>
+		public bool AutoImageLinks { get; set; }
+	}
 }

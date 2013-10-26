@@ -1292,7 +1292,13 @@ namespace MarkDownSharpEditor
 			// Set options
 			mkdwn.ExtraMode = MarkDownSharpEditor.AppSettings.Instance.fMarkdownExtraMode;
 			mkdwn.SafeMode = false;
-			//-----------------------------------
+            
+            mkdwn.GfmOptions.AutoImageLinks = true;
+            mkdwn.GfmOptions.DoubleSquareBracketLinks = true;
+            mkdwn.GfmOptions.Linebreaks = true;
+            mkdwn.GfmOptions.SpacesInLinks = true;
+
+            //-----------------------------------
 
 			ResultText = mkdwn.Transform(ResultText);
 			//表示するHTMLデータを作成
@@ -2171,6 +2177,12 @@ namespace MarkDownSharpEditor
 			// Set options
 			mkdwn.ExtraMode = MarkDownSharpEditor.AppSettings.Instance.fMarkdownExtraMode;
 			mkdwn.SafeMode = false;
+
+            mkdwn.GfmOptions.AutoImageLinks = true;
+            mkdwn.GfmOptions.DoubleSquareBracketLinks = true;
+            mkdwn.GfmOptions.Linebreaks = true;
+            mkdwn.GfmOptions.SpacesInLinks = true;
+
 			//-----------------------------------
 
 			//編集中のファイル（richEditBoxの内容）

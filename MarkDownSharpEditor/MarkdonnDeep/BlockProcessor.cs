@@ -880,7 +880,7 @@ namespace MarkdownDeep
 				}
 
 				// Parse a link definition
-				LinkDefinition l = LinkDefinition.ParseLinkDefinition(this, m_markdown.ExtraMode);
+				LinkDefinition l = LinkDefinition.ParseLinkDefinition(this, m_markdown.ExtraMode, allowSpacesInUrl:true );
 				if (l!=null)
 				{
 					m_markdown.AddLinkDefinition(l);

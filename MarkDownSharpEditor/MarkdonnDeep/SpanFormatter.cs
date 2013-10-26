@@ -463,6 +463,19 @@ namespace MarkdownDeep
 						break;
 					}
 
+					case '\n':
+					{
+						if (m_Markdown.GfmOptions.Linebreaks)
+						{
+							if (!eof)
+							{
+								SkipEol();
+								token = CreateToken(TokenType.br, end_text_token, 0);
+							}
+						}
+						break;
+					}
+
 					case '\\':
 					{
 						// Special handling for escaping <autolinks>
@@ -957,6 +970,9 @@ namespace MarkdownDeep
 			if (!SkipChar('['))
 				return null;
 
+			// Check for second '[' for [[Link]] type links
+			bool doubleBracketed = m_Markdown.GfmOptions.DoubleSquareBracketLinks && SkipChar('[');
+
 			// Is it a foonote?
 			var savepos=position;
 			if (m_Markdown.ExtraMode && token_type==TokenType.link && SkipChar('^'))
@@ -1016,6 +1032,36 @@ namespace MarkdownDeep
 			// The closing ']'
 			SkipForward(1);
 
+			// The second closing ']' for [[Link]] links
+			if (doubleBracketed)
+			{
+				if (SkipChar(']'))
+				{
+					var parts = link_text.Split('|');
+					var url = parts.Length > 1 ? parts[1] : parts[0];
+					var title = parts[0];
+
+					if (m_Markdown.GfmOptions.AutoImageLinks && ((title.EndsWith(".png") || title.EndsWith(".jpg") || title.EndsWith(".gif"))))
+					{
+						var framed = (url == "frame");
+						url = title;
+						if (m_Markdown.GfmOptions.SpacesInLinks) url = url.Replace(' ', '-'); // TODO: Duplicating the ' ' to '-' logic
+						title = title.Substring(0, title.Length - 4);
+						return CreateToken(TokenType.img, new LinkInfo(new LinkDefinition(null, url, null), title, framed ? "frame" : null));
+					}
+
+					// TODO: Should use LinkDefinition.ParseLinkTarget, as we are duplicating the ' ' to '-' logic, but not sure how to do that
+					if (m_Markdown.GfmOptions.SpacesInLinks) url = url.Replace(' ', '-');
+					var link_def = new LinkDefinition(null, url, null);
+					return CreateToken(token_type, new LinkInfo(link_def, title));
+				}
+				else
+				{
+					position = savepos;
+					return null;
+				}
+			}
+
 			// Save position in case we need to rewind
 			savepos = position;
 
@@ -1023,7 +1069,7 @@ namespace MarkdownDeep
 			if (SkipChar('('))
 			{
 				// Extract the url and title
-				var link_def = LinkDefinition.ParseLinkTarget(this, null, m_Markdown.ExtraMode);
+				var link_def = LinkDefinition.ParseLinkTarget(this, null, m_Markdown.ExtraMode, m_Markdown.GfmOptions.SpacesInLinks);
 				if (link_def==null)
 					return null;
 

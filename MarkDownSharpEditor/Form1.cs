@@ -1976,6 +1976,11 @@ namespace MarkDownSharpEditor
             
             // カーソルの画面上の位置
             var curPos = this.azukiRichTextBox1.GetPositionFromIndex(begin);
+            if (curPos.Y < 0 || curPos.Y > this.azukiRichTextBox1.Height)
+            {
+                // 画面左上の文字の位置をと燃える
+                this.azukiRichTextBox1.GetIndexFromPosition(new Point(0, 0));
+            }
 
             begin = this.azukiRichTextBox1.GetIndexFromPosition(new Point(0, 0));
 
@@ -2021,6 +2026,15 @@ namespace MarkDownSharpEditor
                         OffsetTop = e.offsetTop,
                         OffsetHeight = e.offsetHeight,
                     };
+
+                    // offsetTop は body からの位置になるように補正
+                    IHTMLElement parentElement = e.parentElement;
+                    while(parentElement != null && 
+                         (string.Equals(parentElement.tagName,"body",StringComparison.OrdinalIgnoreCase) == false))
+                    {
+                        tag.OffsetTop = tag.OffsetTop + parentElement.offsetTop;
+                        parentElement = parentElement.parentElement;
+                    }
 #if DEBUG
                     tag.outerText = e.outerHTML;
 #endif

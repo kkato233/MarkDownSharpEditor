@@ -81,10 +81,10 @@ namespace MarkdownDeep
             AddTokenBlockRange(b);
 		}
 
-		internal void Format(StringBuilder dest, string str)
+		internal void Format(StringBuilder dest, string str, BlockRange range = null)
 		{
             // Parse the string into a list of tokens
-            Tokenize(str, 0, str.Length, null);
+            Tokenize(str, 0, str.Length, range);
 
             // Render all tokens
             Render(dest, str);
@@ -138,10 +138,10 @@ namespace MarkdownDeep
 
 		// Format a string and return it as a new string
 		// (used in formatting the text of links)
-		internal string Format(string str)
+		internal string Format(string str,BlockRange range = null)
 		{
 			StringBuilder dest = new StringBuilder();
-			Format(dest, str);
+			Format(dest, str, range);
 			return dest.ToString();
 		}
 
@@ -238,7 +238,7 @@ namespace MarkdownDeep
 
 					case TokenType.open_em:
 						sb.Append("<em");
-                        sb.Append(GetDataPosHtmlAttribute(t.startOffset,str));
+                        sb.Append(GetDataPosHtmlAttribute(t));
                         sb.Append(">");
 						break;
 
@@ -248,7 +248,7 @@ namespace MarkdownDeep
 
 					case TokenType.open_strong:
 						sb.Append("<strong");
-                        sb.Append(GetDataPosHtmlAttribute(t.startOffset,str));
+                        sb.Append(GetDataPosHtmlAttribute(t));
                         sb.Append(">");
 						break;
 
@@ -258,7 +258,7 @@ namespace MarkdownDeep
 
 					case TokenType.code_span:
 						sb.Append("<code");
-                        sb.Append(GetDataPosHtmlAttribute(t.startOffset,str));
+                        sb.Append(GetDataPosHtmlAttribute(t));
                         sb.Append(">");
 						m_Markdown.HtmlEncode(sb, str, t.startOffset, t.length);
 						sb.Append("</code>");
@@ -270,14 +270,16 @@ namespace MarkdownDeep
 						var sf = new SpanFormatter(m_Markdown);
 						sf.DisableLinks = true;
 
-						li.def.RenderLink(m_Markdown, sb, sf.Format(li.link_text));
+                        string posAttribute = this.GetDataPosHtmlAttribute(t);
+                        li.def.RenderLink(m_Markdown, sb, sf.Format(li.link_text), posAttribute);
 						break;
 					}
 
 					case TokenType.img:
 					{
 						LinkInfo li = (LinkInfo)t.data;
-						li.def.RenderImg(m_Markdown, sb, li.link_text);
+                        string posAttribute = this.GetDataPosHtmlAttribute(t);
+                        li.def.RenderImg(m_Markdown, sb, li.link_text, optionAttributes: posAttribute);
 						break;
 					}
 
@@ -285,7 +287,7 @@ namespace MarkdownDeep
 					{
 						FootnoteReference r=(FootnoteReference)t.data;
                         sb.Append("<sup");
-                        sb.Append(GetDataPosHtmlAttribute(t.startOffset, str));
+                        sb.Append(GetDataPosHtmlAttribute(t));
                         sb.Append(" id=\"fnref:");
 						sb.Append(r.id);
 						sb.Append("\"><a href=\"#fn:");
@@ -300,7 +302,7 @@ namespace MarkdownDeep
 					{
 						Abbreviation a = (Abbreviation)t.data;
                         sb.Append("<abbr");
-                        sb.Append(GetDataPosHtmlAttribute(t.startOffset, str));
+                        sb.Append(GetDataPosHtmlAttribute(t));
 						if (!String.IsNullOrEmpty(a.Title))
 						{
 							sb.Append(" title=\"");
@@ -433,8 +435,14 @@ namespace MarkdownDeep
 
 						// Rewind if invalid syntax
 						// (the '[' or '!' will be treated as a regular character and processed below)
-						if (token == null)
+						if (token == null) {
 							position = linkpos;
+                        }
+                        else
+                        {
+                            token.startOffset = linkpos;
+                            token.length = position - linkpos;
+                        }
 						break;
 					}
 
@@ -1265,17 +1273,83 @@ namespace MarkdownDeep
 		List<Token> m_Tokens=new List<Token>();
 
 
-        public string GetDataPosHtmlAttribute(int pos,string buf)
+        /// <summary>
+        /// Token の開始と終了の情報を取得する
+        /// </summary>
+        /// <param name="t"></param>
+        /// <param name="buf"></param>
+        /// <returns></returns>
+        public string GetDataPosHtmlAttribute(Token t)
         {
             if (this.m_Markdown.RenderPos == false) return "";
 
             if (this.blockRange == null) return "";
 
-            int ?dPos = this.blockRange.GetIndexOf(pos, buf);
+            string buf = this.input;
+            if (this.blockRange != null && this.blockRange.Items.Any())
+            {
+                buf = this.blockRange.Items.First().buf;
+            }
+            else if (this.blockRange != null && this.blockRange.Tokens.Any())
+            {
+                buf = this.blockRange.Tokens.First().buf;
+            }
 
-            if (dPos == null) return "";
+            int pos = t.startOffset;
 
-            return " data-pos='" + dPos.ToString() + "'";
+            Token endT = t;
+
+            // 開始位置
+            int? dPos = this.blockRange.GetIndexOf(pos, buf);
+
+            // 終了位置
+            if (t.type == TokenType.open_em || t.type == TokenType.open_strong || t.type == TokenType.opening_mark)
+            {
+                endT = FindEndToken(m_Tokens, t);
+            }
+            int? dPos2 = null;
+            if (endT != null)
+            {
+                dPos2 = this.blockRange.GetIndexOf(endT.startOffset + endT.length, buf);
+            }
+            if (dPos == null || dPos2 == null) return "";
+
+            int len = dPos2.Value - dPos.Value;
+
+            return " data-pos='" + dPos.ToString() + "' data-len='" + len.ToString() + "'";
+        }
+
+        /// <summary>
+        /// 対応する token の終了を探す
+        /// </summary>
+        /// <param name="m_Tokens"></param>
+        /// <param name="t"></param>
+        /// <returns></returns>
+        private Token FindEndToken(List<Token> list, Token t)
+        {
+            int startIndex = list.IndexOf(t);
+            if (startIndex < 0) return null;
+
+            TokenType findType;
+            if (t.type == TokenType.open_em)
+            {
+                findType = TokenType.close_em;
+            }
+            else if (t.type == TokenType.open_strong)
+            {
+                findType = TokenType.close_strong;
+            }
+            else if (t.type == TokenType.opening_mark)
+            {
+                findType = TokenType.closing_mark;
+            }
+            else
+            {
+                return null;
+            }
+            Token endToken = list.Skip(startIndex).Where(r => r.type == findType).FirstOrDefault();
+
+            return endToken;
         }
 	}
 }

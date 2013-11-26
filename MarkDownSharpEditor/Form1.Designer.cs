@@ -181,11 +181,13 @@
             this.azukiRichTextBox1.ForeColor = System.Drawing.Color.Black;
             this.azukiRichTextBox1.LinePadding = 5;
             this.azukiRichTextBox1.Name = "azukiRichTextBox1";
+            this.azukiRichTextBox1.ScrollPos = new System.Drawing.Point(0, 0);
             this.azukiRichTextBox1.ShowsDirtBar = false;
             this.azukiRichTextBox1.ShowsHScrollBar = false;
             this.azukiRichTextBox1.ShowsLineNumber = false;
             this.azukiRichTextBox1.ViewType = Sgry.Azuki.ViewType.WrappedProportional;
             this.azukiRichTextBox1.ViewWidth = 4097;
+            this.azukiRichTextBox1.CaretMoved += new System.EventHandler(this.azukiRichTextBox1_CaretMoved);
             this.azukiRichTextBox1.VScroll += new System.EventHandler(this.richTextBox1_VScroll);
             this.azukiRichTextBox1.TextChanged += new System.EventHandler(this.richTextBox1_TextChanged);
             this.azukiRichTextBox1.Enter += new System.EventHandler(this.richTextBox1_Enter);

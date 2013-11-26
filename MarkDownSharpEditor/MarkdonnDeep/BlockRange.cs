@@ -153,6 +153,9 @@ namespace MarkdownDeep
             int skipLen = pos;
             int? lastPos = null;
 
+            BlockRangeItem beforItem = null;
+            int beforAdd = 0;
+
             foreach (var item in this.Items)
             {
                 if (skipLen < item.len)
@@ -160,6 +163,11 @@ namespace MarkdownDeep
                     if (item.buf == buf)
                     {
                         return item.start + skipLen;
+                    }
+                    else if (item.blockType == BlockType.Blank && beforItem != null)
+                    {
+                        // 前の最後を返す
+                        return beforItem.start + beforItem.len + skipLen + beforAdd;
                     }
                     else if (item.buf == null)
                     {
@@ -174,6 +182,15 @@ namespace MarkdownDeep
                 if (item.buf != null)
                 {
                     lastPos = item.start + item.len;
+                }
+                if (item.blockType != BlockType.Blank)
+                {
+                    beforItem = item;
+                    beforAdd = 0;
+                }
+                else
+                {
+                    beforAdd += item.len;
                 }
             }
 

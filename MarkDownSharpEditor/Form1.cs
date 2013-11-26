@@ -1171,6 +1171,7 @@ namespace MarkDownSharpEditor
 
 			string ResultText = "";
 			backgroundWorker1.WorkerReportsProgress = true;
+#if false
 			//編集箇所にマーカーを挿入する
 			//Insert marker in editing
 			if (richTextBox1.SelectionStart > 0)
@@ -1189,7 +1190,10 @@ namespace MarkDownSharpEditor
 			{
 				ResultText = richTextBox1.Text;
 			}
-			backgroundWorker1.RunWorkerAsync(ResultText);
+#else
+            ResultText = richTextBox1.Text;
+#endif
+            backgroundWorker1.RunWorkerAsync(ResultText);
 
 		}
 
@@ -1836,6 +1840,7 @@ namespace MarkDownSharpEditor
             public IHTMLElement e;
 
             public int? TextPos;
+            public int? TextLen;
             public int OffsetAbsDiff;
 #if DEBUG
             public string outerText;
@@ -1847,6 +1852,11 @@ namespace MarkDownSharpEditor
         /// 2:ブラウザに合わせてテキストをスクロール
         /// </summary>
         int ScrollSyncMode = -1;
+
+        /// <summary>
+        /// Idle 時にハイライト表示
+        /// </summary>
+        int Idle_Hightlight = -1;
 
         void Application_Idle(object sender, EventArgs e)
         {
@@ -1867,6 +1877,12 @@ namespace MarkDownSharpEditor
             else
             {
                 ScrollSyncMode = -1;
+            }
+
+            if (Idle_Hightlight > 0)
+            {
+                Idle_Hightlight = -1;
+                OnIdle_Hightlight();
             }
         }
 
@@ -1963,6 +1979,9 @@ namespace MarkDownSharpEditor
                 this.richTextBox1.Select(findCharPos, 0);
                 this.richTextBox1.ScrollToCaret();
             }
+
+            // ハイライトの取り消し
+            OnIdle_Hightlight(list, -1);
         }
 
         /// <summary>
@@ -1972,16 +1991,8 @@ namespace MarkDownSharpEditor
         {
             int begin;
             int end;
-            this.azukiRichTextBox1.GetSelection(out begin, out end);
-            
-            // カーソルの画面上の位置
-            var curPos = this.azukiRichTextBox1.GetPositionFromIndex(begin);
-            if (curPos.Y < 0 || curPos.Y > this.azukiRichTextBox1.Height)
-            {
-                // 画面左上の文字の位置をと燃える
-                this.azukiRichTextBox1.GetIndexFromPosition(new Point(0, 0));
-            }
 
+            // 画面左上の文字の位置
             begin = this.azukiRichTextBox1.GetIndexFromPosition(new Point(0, 0));
 
             var list = GetBrowserDocumentTagPos().Where(r => r.TextPos != null).ToList();
@@ -1996,6 +2007,74 @@ namespace MarkDownSharpEditor
             {
                 Point scrollPos = new Point(0,topItem.OffsetTop);
                 this.webBrowser1.Document.Window.ScrollTo(scrollPos);
+            }
+
+            // カーソル位置のハイライト表示
+            this.azukiRichTextBox1.GetSelection(out begin, out end);
+            int cursorPos = -1;
+            if (begin == end)
+            {
+                cursorPos = begin;
+            }
+            OnIdle_Hightlight(list, cursorPos);
+        }
+
+        private void OnIdle_Hightlight()
+        {
+            // テキストのカーソルのある位置に一番近い位置をハイライト表示させる
+            int begin;
+            int end;
+            this.azukiRichTextBox1.GetSelection(out begin, out end);
+            var list = GetBrowserDocumentTagPos().Where(r => r.TextPos != null).ToList();
+
+            int cursorPos = -1;
+            if (begin == end)
+            {
+                cursorPos = begin;
+            }
+            OnIdle_Hightlight(list, cursorPos);
+        }
+
+        private void OnIdle_Hightlight(List<TagPos> list,int cursorPos)
+        {
+            TagPos targetTag = null;
+            int minTargetTag = this.Height * 2;
+
+            // 目的のカーソルの位置に一番近いタグを選択
+            foreach (var item in list.Where(r => r.TextPos != null && r.TextLen != null))
+            {
+                int diff = cursorPos - item.TextPos.Value;
+                if (diff >= 0 && diff < item.TextLen && diff <= minTargetTag)
+                {
+                    minTargetTag = diff;
+                    targetTag = item;
+                }
+            }
+
+            // 一番近いタグのスタイル設定＆その他のスタイルのクリア
+            foreach (var item in list)
+            {
+                string strStyle = item.e.getAttribute("className") as string;
+                if (string.IsNullOrEmpty(strStyle) == false)
+                {
+                    if (item == targetTag)
+                    {
+                        // 変更しない
+                        targetTag = null;
+                    }
+                    else if (item != targetTag)
+                    {
+                        item.e.setAttribute("className", "");
+                    }
+                }
+            }
+            if (targetTag != null)
+            {
+                IHTMLElement2 el = targetTag.e as IHTMLElement2;
+                if (el != null)
+                {
+                }
+                targetTag.e.setAttribute("className", "_mk");
             }
         }
 
@@ -2039,12 +2118,21 @@ namespace MarkDownSharpEditor
                     tag.outerText = e.outerHTML;
 #endif
                     string s = e.getAttribute("data-pos") as string;
-                    int pos;
                     if (string.IsNullOrEmpty(s) == false)
                     {
+                        int pos;
                         if (int.TryParse(s, out pos))
                         {
                             tag.TextPos = pos;
+                        }
+                    }
+                    s = e.getAttribute("data-len") as string;
+                    if (string.IsNullOrEmpty(s) == false)
+                    {
+                        int len;
+                        if (int.TryParse(s, out len))
+                        {
+                            tag.TextLen = len;
                         }
                     }
                     list.Add(tag);
@@ -3935,6 +4023,11 @@ namespace MarkDownSharpEditor
 		}
 
 		#endregion
+
+        private void azukiRichTextBox1_CaretMoved(object sender, EventArgs e)
+        {
+            Idle_Hightlight = 1;
+        }
 
 		//======================================================================
 		#region WebBrowserコンポーネントのカチカチ音制御

@@ -173,7 +173,7 @@ namespace MarkdownDeep
 		}
 
 		// Render opening tag (eg: <tag attr="value">
-		public void RenderOpening(StringBuilder dest)
+		public void RenderOpening(StringBuilder dest,string optionAttributes = null)
 		{
 			dest.Append("<");
 			dest.Append(name);
@@ -185,6 +185,10 @@ namespace MarkdownDeep
 				dest.Append(i.Value);
 				dest.Append("\"");
 			}
+            if (optionAttributes != null)
+            {
+                dest.Append(optionAttributes);
+            }
 
 			if (m_closed)
 				dest.Append(" />");

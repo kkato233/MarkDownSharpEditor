@@ -326,8 +326,9 @@ namespace MarkdownDeep
 					{
 						m.OnPrepareImage(tag, m.RenderingTitledImage);
 					}
+                    string optionAttribute = this.GetDataPosHtmlAttribute(m);
 
-					tag.RenderOpening(b);
+                    tag.RenderOpening(b, optionAttribute);
 					b.Append("\n");
 					RenderChildren(m, b);
 					tag.RenderClosing(b);
@@ -506,6 +507,8 @@ namespace MarkdownDeep
 			contentLen = other.contentLen;
 			lineStart = other.lineStart;
 			lineLen = other.lineLen;
+            blockRange = other.blockRange;
+
 			return this;
 		}
 
@@ -579,22 +582,137 @@ namespace MarkdownDeep
             if (m.RenderPos == false) return "";
 
             int? pos = this.globalContentStart;
-            if (pos == null) return "";
 
-            return " data-pos='" + pos.ToString() + "'";
+            int len = this.contentLen;
+
+            if (pos == null || len == 0)
+            {
+                int? endPos = null;
+                if (this.children != null && this.children.Any())
+                {
+                    pos = GetFirstPos(this.children);
+                    endPos = GetLastPos(this.children);
+                }
+                else if (this.blockRange != null && this.blockRange.Items.Any())
+                {
+                    pos = GetFirstPos(this.blockRange);
+                    endPos = GetLastPos(this.blockRange);
+                }
+                if (endPos != null && pos != null)
+                {
+                    len = endPos.Value - pos.Value;
+                }
+
+                if (pos == null || len == 0) return "";
+            }
+
+
+            return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
+        }
+
+        private int? GetFirstPos(List<Block> list)
+        {
+            foreach (var item in list.Where(r => r.blockRange != null))
+            {
+                int? blockFirst = GetFirstPos(item.blockRange);
+                if (blockFirst != null)
+                {
+                    return blockFirst;
+                }
+            }
+            return null;
+        }
+
+        private int? GetFirstPos(BlockRange blockRange)
+        {
+            int offset = 0;
+            for (int i = 0; i < blockRange.Items.Count; i++)
+            {
+                int? pos = blockRange.GetIndexOf(offset,this.buf);
+                if (pos != null)
+                {
+                    return pos;
+                }
+                offset = offset + blockRange.Items[i].len;
+            }
+            return null;
+        }
+
+        private int? GetLastPos(List<Block> list)
+        {
+            int pos = -1;
+            foreach (var item in list.Where(r => r.blockRange != null))
+            {
+                int? lastPos = item.globalContentEnd;
+                if (lastPos != null && lastPos.Value > pos)
+                {
+                    pos = lastPos.Value;
+                }
+            }
+            if (pos >= 0) {
+                return pos;
+            } else {
+                return null;
+            }
+        }
+
+        private int? GetLastPos(BlockRange range)
+        {
+            int offset = this.contentStart + this.contentLen;
+
+            for (int i = blockRange.Items.Count -1 ; i >= 0; i--)
+            {
+                int? pos = blockRange.GetIndexOf(offset, this.buf);
+                if (pos != null)
+                {
+                    return pos;
+                }
+                offset = offset - blockRange.Items[i].len;
+            }
+            return null;
         }
 
         public int? globalContentStart
         {
             get
             {
-                if (this.blockRange != null)
+                if (this.blockRange != null && this.blockRange.Items.Any())
                 {
-                    return this.blockRange.GetIndexOf(contentStart, this.buf);
+                    string contentBuf = this.blockRange.Items.First().buf;
+                    return this.blockRange.GetIndexOf(contentStart, contentBuf);
+                }
+                if (this.blockRange != null && this.blockRange.Tokens.Any())
+                {
+                    string contentBuf = this.blockRange.Tokens.First().buf;
+                    return this.blockRange.GetIndexOf(contentStart, contentBuf);
+                }
+                else if (this.buf == null)
+                {
+                    return null;
                 }
                 else
                 {
                     return contentStart;
+                }
+            }
+        }
+        public int ? globalContentEnd
+        {
+            get
+            {
+                if (this.blockRange != null)
+                {
+                    int pos = this.contentStart + this.contentLen;
+
+                    return this.blockRange.GetIndexOf(pos, this.buf);
+                }
+                else if (this.buf == null)
+                {
+                    return null;
+                }
+                else
+                {
+                    return this.contentStart + this.contentLen;
                 }
             }
         }

@@ -145,7 +145,7 @@
     <value>azukiRichTextBox1</value>
   </data>
   <data name="&gt;&gt;azukiRichTextBox1.Type" xml:space="preserve">
-    <value>Sgry.Azuki.WinForms.AzukiControl, Azuki, Version=1.7.7.903, Culture=neutral, PublicKeyToken=46b77eb7f2d82aba</value>
+    <value>Sgry.Azuki.WinForms.AzukiControl, Azuki, Version=1.7.8.30580, Culture=neutral, PublicKeyToken=46b77eb7f2d82aba</value>
   </data>
   <data name="&gt;&gt;azukiRichTextBox1.Parent" xml:space="preserve">
     <value>splitContainer1.Panel1</value>

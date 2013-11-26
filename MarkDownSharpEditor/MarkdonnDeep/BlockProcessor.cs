@@ -1366,6 +1366,7 @@ namespace MarkdownDeep
 
                     Block item = CreateBlock().CopyFrom(lines[i]);
                     List.children.Add(item);
+                    List.buf = item.buf;
 
 #if false
                     var l = lines[i];
@@ -1379,6 +1380,7 @@ namespace MarkdownDeep
 					// Build a new string containing all child items
 					bool bAnyBlanks = false;
 					StringBuilder sb = m_markdown.GetStringBuilder();
+                    string itemBuf = null;
 					for (int j = start_of_li; j <= end_of_li; j++)
 					{
 						var l = lines[j];
@@ -1387,15 +1389,21 @@ namespace MarkdownDeep
 
                         range.Append(l, l.contentStart, l.contentLen);
                         range.Append("\n", 0, 1);
-						if (lines[j].blockType == BlockType.Blank)
-						{
-							bAnyBlanks = true;
-						}
+                        if (lines[j].blockType == BlockType.Blank)
+                        {
+                            bAnyBlanks = true;
+                        }
+                        else
+                        {
+                            itemBuf = l.buf;
+                        }
 					}
 
 					// Create the item and process child blocks
 					var item = new Block(BlockType.li);
                     item.children = new BlockProcessor(m_markdown, m_bMarkdownInHtml, listType).ProcessRange(sb.ToString(), range);
+                    item.blockRange = range;
+                    item.buf = itemBuf;
 #if false
                     foreach (var childBlock in item.children)
                     {
@@ -1418,6 +1426,7 @@ namespace MarkdownDeep
 
 					// Add the complex item
 					List.children.Add(item);
+                    List.buf = item.buf;
 				}
 
                 // Continue processing from end of li

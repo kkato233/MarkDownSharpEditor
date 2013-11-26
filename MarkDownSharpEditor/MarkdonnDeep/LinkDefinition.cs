@@ -142,14 +142,14 @@ namespace MarkdownDeep
 
 
 		// Parse a link definition from a string (used by test cases)
-		internal static LinkDefinition ParseLinkDefinition(string str, bool ExtraMode, bool allowSpacesInUrl)
+		internal static LinkDefinition ParseLinkDefinition(string str, bool ExtraMode, bool allowSpacesInUrl = false)
 		{
 			StringScanner p = new StringScanner(str);
 			return ParseLinkDefinitionInternal(p, ExtraMode, allowSpacesInUrl);
 		}
 
 		// Parse a link definition
-		internal static LinkDefinition ParseLinkDefinition(StringScanner p, bool ExtraMode, bool allowSpacesInUrl)
+        internal static LinkDefinition ParseLinkDefinition(StringScanner p, bool ExtraMode, bool allowSpacesInUrl = false)
 		{
 			int savepos=p.position;
 			var l = ParseLinkDefinitionInternal(p, ExtraMode, allowSpacesInUrl);

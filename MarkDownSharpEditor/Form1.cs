@@ -1707,9 +1707,10 @@ namespace MarkDownSharpEditor
             // マウスがクリックした要素を求める。
             var pos = this.webBrowser1.PointToClient(MousePosition);
             var elem = this.webBrowser1.Document.GetElementFromPoint(pos);
-            int dataPos = GetDataPos(elem);
+            int? dataPos = GetDataPos(elem);
+            int? offsetTop = null;
 
-            while (dataPos <= 0 && elem != null)
+            while (dataPos == null && elem != null)
             {
                 elem = elem.Parent;
                 if (elem == null) break;
@@ -1717,12 +1718,27 @@ namespace MarkDownSharpEditor
                 dataPos = GetDataPos(elem);
             }
 
-            if (dataPos > 5)
+            if (dataPos != null)
             {
                 // まだ完ぺきに data-pos の値が設定できていないので・・仕方ないが・・
 
+                IHTMLElement iElem = elem.DomElement as IHTMLElement;
+
+
+                if (iElem != null)
+                {
+                    offsetTop = iElem.offsetTop;
+                }
+                if (offsetTop != null)
+                {
+                    IHTMLDocument3 doc3 = (IHTMLDocument3)webBrowser1.Document.DomDocument;
+                    IHTMLElement2 elm = (IHTMLElement2)doc3.documentElement;
+                    int scrollTop = elm.scrollTop;
+
+                    offsetTop = offsetTop.Value - scrollTop;
+                }
                 // 指定の文字の位置に移動
-                ScrollSyncTextPos(dataPos);
+                ScrollSyncTextPos(dataPos.Value ,offsetTop);
             }
             else
             {
@@ -1738,8 +1754,21 @@ namespace MarkDownSharpEditor
         /// </summary>
         /// <param name="elem"></param>
         /// <returns></returns>
-        private int GetDataPos(HtmlElement elem)
+        private int? GetDataPos(HtmlElement elem)
         {
+            // 調査対象外のタグの場合
+            List<string> notCheckTags = new List<string>() { "body", "html" };
+
+            foreach (string ngTag in notCheckTags)
+            {
+                if (string.Equals(elem.TagName, ngTag, StringComparison.OrdinalIgnoreCase))
+                {
+                    // body の場合は関係ない
+                    return null;
+                }
+            }
+
+            // data-pos を探す
             string outHtml = elem.OuterHtml;
             List<int> posList = new List<int>();
             var m = regDataPos.Match(outHtml);
@@ -1760,7 +1789,7 @@ namespace MarkDownSharpEditor
             }
             else
             {
-                return 0;
+                return null;
             }
         }
 
@@ -1866,7 +1895,7 @@ namespace MarkDownSharpEditor
         /// ブラウザのクリックによって目的の位置を表示させるために利用
         /// </summary>
         /// <param name="pos"></param>
-        private void ScrollSyncTextPos(int pos)
+        private void ScrollSyncTextPos(int pos,int ?offsetTop)
         {
             ScrollSyncMode = -1;
 

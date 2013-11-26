@@ -31,7 +31,7 @@ namespace MarkdownDeep
 	 */
 
 	// TokenType - what sort of token?
-	internal enum TokenType
+	public enum TokenType
 	{
 		Text,			// Plain text, should be htmlencoded
 		HtmlTag,		// Valid html tag, write out directly but escape &amps;

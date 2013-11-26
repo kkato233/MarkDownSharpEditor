@@ -63,37 +63,6 @@ namespace MarkdownDeep
 		}
 
 
-        // Scan a string for a valid identifier.  Identifier must start with alpha or underscore
-        // and can be followed by alpha, digit or underscore
-        // Updates `pos` to character after the identifier if matched
-        public static bool ParseIdentifier(StringProxy str, ref int pos, ref string identifer)
-        {
-            if (pos >= str.Length)
-                return false;
-
-            // Must start with a letter or underscore
-            char c = str[pos];
-            if (!char.IsLetter(c) && c != '_')
-            {
-                return false;
-            }
-
-            // Find the end
-            int startpos = pos;
-            pos++;
-            c = str[pos];
-
-            while (pos < str.Length && (char.IsDigit(c) || char.IsLetter(c) || c == '_'))
-            {
-                pos++;
-                c = str[pos];
-            }
-
-            // Return it
-            identifer = str.Substring(startpos, pos - startpos).str;
-            return true;
-        }
-
 		// Scan a string for a valid identifier.  Identifier must start with alpha or underscore
 		// and can be followed by alpha, digit or underscore
 		// Updates `pos` to character after the identifier if matched

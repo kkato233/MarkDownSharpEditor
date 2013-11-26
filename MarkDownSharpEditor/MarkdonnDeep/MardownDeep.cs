@@ -70,11 +70,58 @@ namespace MarkdownDeep
 			return Transform(str, out defs);
 		}
 
+        /// <summary>
+        /// 文字列を解析して 文字列の開始と終了ポイントを返す
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public BlockRange ProcessBlockRange(string str)
+        {
+            BlockRange range = new BlockRange();
+            var list = ProcessBlocks(str);
+            Dictionary<string, LinkDefinition> dic = new Dictionary<string, LinkDefinition>();
+            string s = Transform(list, out dic);
+
+            HashSet<BlockRange> rangeHash = new HashSet<BlockRange>();
+
+            foreach (var b in list)
+            {
+                if (b.lineStart == 0 && b.lineLen == 0)
+                {
+                    range.Append(b, b.contentStart, b.contentEnd);
+                }
+                else
+                {
+                    range.Append(b, b.lineStart, b.lineLen);
+                }
+                if (b.blockRange != null && rangeHash.Contains(b.blockRange) == false)
+                {
+
+                    // BlockType を正しく設定
+                    b.blockRange.Items.Where(r => r.buf == null).ToList().ForEach(r =>
+                    {
+                        r.buf = b.buf;
+                    });
+
+                    rangeHash.Add(b.blockRange);
+                    range.Tokens.AddRange(b.blockRange.Tokens);
+                }
+            }
+
+            return range;
+        }
+
 		// Transform a string
 		public string Transform(string str, out Dictionary<string, LinkDefinition> definitions)
 		{
-			// Build blocks
-			var blocks = ProcessBlocks(str);
+            // Build blocks
+            var blocks = ProcessBlocks(str);
+
+            return Transform(blocks, out definitions);
+        }
+
+        internal string Transform(List<Block> blocks, out Dictionary<string, LinkDefinition> definitions)
+        {
 
 			// Sort abbreviations by length, longest to shortest
 			if (m_AbbreviationMap != null)
@@ -836,38 +883,7 @@ namespace MarkdownDeep
 				p.SkipForward(1);
 			}
 		}
-        internal void HtmlEncode(StringBuilder dest, StringProxy str, int start, int len)
-        {
-            m_StringScanner.Reset(str, start, len);
-            var p = m_StringScanner;
-            while (!p.eof)
-            {
-                char ch = p.current;
-                switch (ch)
-                {
-                    case '&':
-                        dest.Append("&amp;");
-                        break;
 
-                    case '<':
-                        dest.Append("&lt;");
-                        break;
-
-                    case '>':
-                        dest.Append("&gt;");
-                        break;
-
-                    case '\"':
-                        dest.Append("&quot;");
-                        break;
-
-                    default:
-                        dest.Append(ch);
-                        break;
-                }
-                p.SkipForward(1);
-            }
-        }
 
 		// HtmlEncode a string, also converting tabs to spaces (used by CodeBlocks)
 		internal void HtmlEncodeAndConvertTabsToSpaces(StringBuilder dest, string str, int start, int len)
@@ -923,13 +939,13 @@ namespace MarkdownDeep
 			}
 		}
 
-        internal string MakeUniqueHeaderID(StringProxy strHeaderText)
+		internal string MakeUniqueHeaderID(string strHeaderText)
 		{
 			return MakeUniqueHeaderID(strHeaderText, 0, strHeaderText.Length);
 
 		}
 
-		internal string MakeUniqueHeaderID(StringProxy strHeaderText, int startOffset, int length)
+		internal string MakeUniqueHeaderID(string strHeaderText, int startOffset, int length)
 		{
 			if (!AutoHeadingIDs)
 				return null;
@@ -991,22 +1007,19 @@ namespace MarkdownDeep
 
 		internal Block CreateBlock()
 		{
-            Block b;
-
 			if (m_SpareBlocks.Count!=0)
-            {
-                b = m_SpareBlocks.Pop();
-            }
+				return m_SpareBlocks.Pop();
 			else
-            {
-                b = new Block();
-            }
-            b.ParentBlock = null;
-            return b;
+				return new Block();
 		}
 
 		internal void FreeBlock(Block b)
 		{
+            if (b.blockRange != null) return; // このブロックは回収対象外
+            if (b.IsUse) return;
+
+            return;
+
 			m_SpareBlocks.Push(b);
 		}
 
@@ -1024,7 +1037,7 @@ namespace MarkdownDeep
 		Dictionary<string, Abbreviation> m_AbbreviationMap;
 		List<Abbreviation> m_AbbreviationList;
 
-	
+
 	}
 
 	/// <summary>

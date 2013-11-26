@@ -51,40 +51,19 @@ namespace MarkdownDeep
 		}
 
 		// Reset
-		public void Reset(string str)
+        public void Reset(string str, BlockRange range = null)
 		{
-			Reset(str, 0, str!=null ? str.Length : 0);
+			Reset(str, 0, str!=null ? str.Length : 0, range);
 		}
 
 		// Reset
-		public void Reset(string str, int pos)
+		public void Reset(string str, int pos,BlockRange range = null)
 		{
-			Reset(str, pos, str!=null ? str.Length - pos : 0);
+			Reset(str, pos, str!=null ? str.Length - pos : 0, range);
 		}
 
-        public void Reset(StringProxy s)
-        {
-            this.proxy = s;
-            this.start = 0;
-            this.pos = 0;
-            this.end = proxy.Length;
-
-            _prev_pos = -1;
-        }
-        public void Reset(StringProxy s,int pos,int len)
-        {
-            this.proxy = s;
-            this.start = pos;
-            this.pos = pos;
-            this.end = pos + len;
-            
-            if (end > proxy.Length)
-                end = proxy.Length;
-
-            _prev_pos = -1;
-        }
 		// Reset
-		public void Reset(string str, int pos, int len)
+		public void Reset(string str, int pos, int len, BlockRange range = null)
 		{
 			if (str == null)
 				str = "";
@@ -95,17 +74,15 @@ namespace MarkdownDeep
 			if (pos > str.Length)
 				pos = str.Length;
 
-			//this.str = str;
-            this.proxy = new StringProxy(str);
-
-            this.start = pos;
+			this.str = str;
+			this.start = pos;
 			this.pos = pos;
 			this.end = pos + len;
 
 			if (end > str.Length)
 				end = str.Length;
 
-            _prev_pos = -1;
+            this.blockRange = range;
 		}
 
 		// Get the entire input string
@@ -122,25 +99,12 @@ namespace MarkdownDeep
 		{
 			get
 			{
-                if (pos == _prev_pos) return _prev_char;
-
-                if (pos < start || pos >= end)
-                {
-                    _prev_pos = pos;
-                    _prev_char = '\0';
-                    return '\0';
-                }
-                else
-                {
-                    //return str[pos];
-                    _prev_char = proxy[pos];
-                    _prev_pos = pos;
-                    return _prev_char;
-                }
+				if (pos < start || pos >= end)
+					return '\0';
+				else
+					return str[pos];
 			}
 		}
-        int _prev_pos = -1;
-        char _prev_char = '\0';
 
 		// Get/set the current position
 		public int position
@@ -177,7 +141,7 @@ namespace MarkdownDeep
 		{
 			while (pos < end)
 			{
-				char ch=proxy[pos];
+				char ch=str[pos];
 				if (ch=='\r' || ch=='\n')
 					break;
 				pos++;
@@ -189,11 +153,11 @@ namespace MarkdownDeep
 		{
 			if (pos < end)
 			{
-                char ch = proxy[pos];
+				char ch = str[pos];
 				if (ch == '\r')
 				{
 					pos++;
-                    if (pos < end && proxy[pos] == '\n')
+					if (pos < end && str[pos] == '\n')
 						pos++;
 					return true;
 				}
@@ -201,7 +165,7 @@ namespace MarkdownDeep
 				else if (ch == '\n')
 				{
 					pos++;
-                    if (pos < end && proxy[pos] == '\r')
+					if (pos < end && str[pos] == '\r')
 						pos++;
 					return true;
 				}
@@ -227,9 +191,7 @@ namespace MarkdownDeep
 				return '\0';
 			if (index >= end)
 				return '\0';
-			
-            //return str[index];
-            return proxy[index];
+			return str[index];
 		}
 
 		// Skip a number of characters
@@ -360,8 +322,7 @@ namespace MarkdownDeep
 		// Extract a substring
 		public string Substring(int start)
 		{
-			//return str.Substring(start, end-start);
-            return proxy.Substring(start, end - start).str;
+			return str.Substring(start, end-start);
 		}
 
 		// Extract a substring
@@ -370,8 +331,7 @@ namespace MarkdownDeep
 			if (start + len > end)
 				len = end - start;
 
-			//return str.Substring(start, len);
-            return proxy.Substring(start, len).str;
+			return str.Substring(start, len);
 		}
 
 		// Scan forward for a character
@@ -476,14 +436,6 @@ namespace MarkdownDeep
 			return str.Substring(mark, pos - mark);
 		}
 
-        public StringProxy ExtractProxy()
-        {
-            if (mark >= pos)
-                return StringProxy.Empty;
-
-            return proxy.Substring(mark, pos - mark);
-        }
-
 		// Skip an identifier
 		public bool SkipIdentifier(ref string identifier)
 		{
@@ -582,19 +534,12 @@ namespace MarkdownDeep
 		}
 
 		// Attributes
-
-        protected StringProxy proxy;
-
-		string str
-        {
-            get
-            {
-                return proxy.str;
-            }
-        }
+		string str;
 		int start;
 		int pos;
 		int end;
 		int mark;
+        
+        protected BlockRange blockRange;
 	}
 }

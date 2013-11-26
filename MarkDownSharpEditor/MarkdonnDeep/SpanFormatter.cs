@@ -30,10 +30,14 @@ namespace MarkdownDeep
 		}
 
 
-		internal void FormatParagraph(StringBuilder dest, StringProxy str, int start, int len, int offset,bool renderPos)
+		internal void FormatParagraph(StringBuilder dest, Block b)
 		{
+            string str = b.buf;
+            int start = b.contentStart;
+            int len = b.contentLen;
+
 			// Parse the string into a list of tokens
-			Tokenize(str, start, len);
+			Tokenize(str, start, len, b.blockRange);
 
 			// Titled image?
 			if (m_Tokens.Count == 1 && m_Markdown.HtmlClassTitledImages != null && m_Tokens[0].type == TokenType.img)
@@ -44,12 +48,7 @@ namespace MarkdownDeep
 				// Render the div opening
 				dest.Append("<div class=\"");
 				dest.Append(m_Markdown.HtmlClassTitledImages);
-				dest.Append("\"");
-                if (renderPos)
-                {
-                    dest.Append(" data-pos='" + (start + offset).ToString() + "'");
-                }
-                dest.Append(">\n");
+				dest.Append("\">\n");
 
 				// Render the img
 				m_Markdown.RenderingTitledImage = true;
@@ -60,7 +59,9 @@ namespace MarkdownDeep
 				// Render the title
 				if (!String.IsNullOrEmpty(li.def.title))
 				{
-					dest.Append("<p>");
+					dest.Append("<p");
+                    dest.Append(b.GetDataPosHtmlAttribute(m_Markdown));
+                    dest.Append(">");
 					Utils.SmartHtmlEncodeAmpsAndAngles(dest, li.def.title);
 					dest.Append("</p>\n");
 				}
@@ -70,35 +71,63 @@ namespace MarkdownDeep
 			else
 			{
 				// Render the paragraph
-				dest.Append("<p");
-                if (renderPos)
-                {
-                    int? pos = this.proxy.LocalPosToGlobalPos(start + offset);
-                    dest.Append(" data-pos='" + pos.ToString() + "'");
-                    //dest.Append(" contenteditable='true'");
-                }
+                dest.Append("<p");
+                dest.Append(b.GetDataPosHtmlAttribute(m_Markdown));
                 dest.Append(">");
 				Render(dest, str);
 				dest.Append("</p>\n");
 			}
+
+            AddTokenBlockRange(b);
 		}
 
-		internal void Format(StringBuilder dest, StringProxy str)
+		internal void Format(StringBuilder dest, string str)
 		{
-			Format(dest, str, 0, str.Length);
+            // Parse the string into a list of tokens
+            Tokenize(str, 0, str.Length, null);
+
+            // Render all tokens
+            Render(dest, str);
 		}
 
 		// Format a range in an input string and write it to the destination string builder.
-		internal void Format(StringBuilder dest, StringProxy str, int start, int len)
+		internal void Format(StringBuilder dest, Block b)
 		{
 			// Parse the string into a list of tokens
-			Tokenize(str, start, len);
+			Tokenize(b.buf,b.contentStart,b.contentLen,b.blockRange);
 
 			// Render all tokens
-			Render(dest, str);
+			Render(dest, b.buf);
+
+            AddTokenBlockRange(b);
 		}
 
-		internal void FormatPlain(StringBuilder dest, StringProxy str, int start, int len)
+        /// <summary>
+        /// Block の BlockRange の中に Token の詳細情報を入れる
+        /// </summary>
+        /// <param name="b"></param>
+        private void AddTokenBlockRange(Block b)
+        {
+            if (b == null || b.blockRange == null) return;
+
+            foreach (var token in this.m_Tokens)
+            {
+                var list = b.blockRange.GetRange(token.startOffset,token.length);
+                foreach(var item in list) {
+                    var t = new BlockRange.TokenRangeItem()
+                    {
+                        buf = b.buf,
+                        blockType = b.blockType,
+                        tokenType = token.type,
+                        start = item.start,
+                        len = item.len,
+                    };
+                    b.blockRange.Tokens.Add(t);
+                }
+            }
+        }
+
+		internal void FormatPlain(StringBuilder dest, string str, int start, int len)
 		{
 			// Parse the string into a list of tokens
 			Tokenize(str, start, len);
@@ -109,37 +138,36 @@ namespace MarkdownDeep
 
 		// Format a string and return it as a new string
 		// (used in formatting the text of links)
-		internal string Format(StringProxy str)
+		internal string Format(string str)
 		{
 			StringBuilder dest = new StringBuilder();
-			Format(dest, str, 0, str.Length);
+			Format(dest, str);
 			return dest.ToString();
 		}
 
-		internal string MakeID(StringProxy str)
+		internal string MakeID(string str)
 		{
 			return MakeID(str, 0, str.Length);
 		}
 
-		internal string MakeID(StringProxy str, int start, int len)
+		internal string MakeID(string str, int start, int len)
 		{
 			// Parse the string into a list of tokens
 			Tokenize(str, start, len);
 	
-			//StringBuilder sb = new StringBuilder();
-            StringProxy sbx = new StringProxy();
+			StringBuilder sb = new StringBuilder();
 
 			foreach (var t in m_Tokens)
 			{
 				switch (t.type)
 				{
 					case TokenType.Text:
-						sbx.Append(str, t.startOffset, t.length);
+						sb.Append(str, t.startOffset, t.length);
 						break;
 
 					case TokenType.link:
 						LinkInfo li = (LinkInfo)t.data;
-						sbx.Append(new StringProxy(li.link_text,Literal:true));
+						sb.Append(li.link_text);
 						break;
 				}
 
@@ -147,7 +175,7 @@ namespace MarkdownDeep
 			}
 
 			// Now clean it using the same rules as pandoc
-			base.Reset(sbx);
+			base.Reset(sb.ToString());
 
 			// Skip everything up to the first letter
 			while (!eof)
@@ -158,7 +186,7 @@ namespace MarkdownDeep
 			}
 
 			// Process all characters
-            StringBuilder sb = new StringBuilder();
+			sb.Length = 0;
 			while (!eof)
 			{
 				char ch = current;
@@ -180,7 +208,7 @@ namespace MarkdownDeep
 		}
 
 		// Render a list of tokens to a destinatino string builder.
-		private void Render(StringBuilder sb, StringProxy proxy)
+		private void Render(StringBuilder sb, string str)
 		{
 			foreach (Token t in m_Tokens)
 			{
@@ -188,12 +216,12 @@ namespace MarkdownDeep
 				{
 					case TokenType.Text:
 						// Append encoded text
-						m_Markdown.HtmlEncode(sb, proxy, t.startOffset, t.length);
+						m_Markdown.HtmlEncode(sb, str, t.startOffset, t.length);
 						break;
 
 					case TokenType.HtmlTag:
 						// Append html as is
-						Utils.SmartHtmlEncodeAmps(sb, proxy.str, t.startOffset, t.length);
+						Utils.SmartHtmlEncodeAmps(sb, str, t.startOffset, t.length);
 						break;
 
 					case TokenType.Html:
@@ -201,7 +229,7 @@ namespace MarkdownDeep
 					case TokenType.closing_mark:
 					case TokenType.internal_mark:
 						// Append html as is
-						sb.Append(proxy.str, t.startOffset, t.length);
+						sb.Append(str, t.startOffset, t.length);
 						break;
 
 					case TokenType.br:
@@ -209,7 +237,9 @@ namespace MarkdownDeep
 						break;
 
 					case TokenType.open_em:
-						sb.Append("<em>");
+						sb.Append("<em");
+                        sb.Append(GetDataPosHtmlAttribute(t.startOffset,str));
+                        sb.Append(">");
 						break;
 
 					case TokenType.close_em:
@@ -217,7 +247,9 @@ namespace MarkdownDeep
 						break;
 
 					case TokenType.open_strong:
-						sb.Append("<strong>");
+						sb.Append("<strong");
+                        sb.Append(GetDataPosHtmlAttribute(t.startOffset,str));
+                        sb.Append(">");
 						break;
 
 					case TokenType.close_strong:
@@ -225,8 +257,10 @@ namespace MarkdownDeep
 						break;
 
 					case TokenType.code_span:
-						sb.Append("<code>");
-						m_Markdown.HtmlEncode(sb, proxy, t.startOffset, t.length);
+						sb.Append("<code");
+                        sb.Append(GetDataPosHtmlAttribute(t.startOffset,str));
+                        sb.Append(">");
+						m_Markdown.HtmlEncode(sb, str, t.startOffset, t.length);
 						sb.Append("</code>");
 						break;
 
@@ -236,7 +270,7 @@ namespace MarkdownDeep
 						var sf = new SpanFormatter(m_Markdown);
 						sf.DisableLinks = true;
 
-						li.def.RenderLink(m_Markdown, sb, sf.Format(new StringProxy(li.link_text,Literal:true)));
+						li.def.RenderLink(m_Markdown, sb, sf.Format(li.link_text));
 						break;
 					}
 
@@ -250,7 +284,9 @@ namespace MarkdownDeep
 					case TokenType.footnote:
 					{
 						FootnoteReference r=(FootnoteReference)t.data;
-						sb.Append("<sup id=\"fnref:");
+                        sb.Append("<sup");
+                        sb.Append(GetDataPosHtmlAttribute(t.startOffset, str));
+                        sb.Append(" id=\"fnref:");
 						sb.Append(r.id);
 						sb.Append("\"><a href=\"#fn:");
 						sb.Append(r.id);
@@ -263,7 +299,8 @@ namespace MarkdownDeep
 					case TokenType.abbreviation:
 					{
 						Abbreviation a = (Abbreviation)t.data;
-						sb.Append("<abbr");
+                        sb.Append("<abbr");
+                        sb.Append(GetDataPosHtmlAttribute(t.startOffset, str));
 						if (!String.IsNullOrEmpty(a.Title))
 						{
 							sb.Append(" title=\"");
@@ -282,14 +319,14 @@ namespace MarkdownDeep
 		}
 
 		// Render a list of tokens to a destinatino string builder.
-		private void RenderPlain(StringBuilder sb, StringProxy str)
+		private void RenderPlain(StringBuilder sb, string str)
 		{
 			foreach (Token t in m_Tokens)
 			{
 				switch (t.type)
 				{
 					case TokenType.Text:
-						sb.Append(str.str, t.startOffset, t.length);
+						sb.Append(str, t.startOffset, t.length);
 						break;
 
 					case TokenType.HtmlTag:
@@ -311,7 +348,7 @@ namespace MarkdownDeep
 						break;
 
 					case TokenType.code_span:
-						sb.Append(str.str, t.startOffset, t.length);
+						sb.Append(str, t.startOffset, t.length);
 						break;
 
 					case TokenType.link:
@@ -338,10 +375,10 @@ namespace MarkdownDeep
 		}
 
 		// Scan the input string, creating tokens for anything special 
-		public void Tokenize(StringProxy str, int start, int len)
+		public void Tokenize(string str, int start, int len, BlockRange range = null)
 		{
 			// Prepare
-			base.Reset(str, start, len);
+			base.Reset(str, start, len, range);
 			m_Tokens.Clear();
 
 			List<Token> emphasis_marks = null;
@@ -1226,5 +1263,19 @@ namespace MarkdownDeep
 		Markdown m_Markdown;
 		internal bool DisableLinks;
 		List<Token> m_Tokens=new List<Token>();
+
+
+        public string GetDataPosHtmlAttribute(int pos,string buf)
+        {
+            if (this.m_Markdown.RenderPos == false) return "";
+
+            if (this.blockRange == null) return "";
+
+            int ?dPos = this.blockRange.GetIndexOf(pos, buf);
+
+            if (dPos == null) return "";
+
+            return " data-pos='" + dPos.ToString() + "'";
+        }
 	}
 }

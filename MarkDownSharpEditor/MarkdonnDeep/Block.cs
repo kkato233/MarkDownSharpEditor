@@ -272,7 +272,9 @@ namespace MarkdownDeep
 					{
                         b.Append("<pre");
                         b.Append(this.GetDataPosHtmlAttribute(m));
-                        b.Append("><code>");
+                        b.Append("><code");
+                        b.Append(this.GetCodeLangAttribute(m));
+                        b.Append(">");
 						foreach (var line in children)
 						{
 							m.HtmlEncodeAndConvertTabsToSpaces(b, line.buf, line.contentStart, line.contentLen, line.hint);
@@ -521,6 +523,7 @@ namespace MarkdownDeep
 		internal int lineLen;
 		internal object data;			// content depends on block type
 		internal List<Block> children;
+        internal string codeBlockLang;
         internal GlobalPositionHint hint;
 
         public string GetDataPosHtmlAttribute(Markdown m)
@@ -533,6 +536,15 @@ namespace MarkdownDeep
             int len = this.contentLen;
 
             return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
+        }
+
+        public string GetCodeLangAttribute(Markdown m)
+        {
+            if (m.RenderPos == false) return "";
+
+            if (string.IsNullOrEmpty(this.codeBlockLang)) return "";
+
+            return " class='lang-" + this.codeBlockLang.Trim() + "'";
         }
 
 	}

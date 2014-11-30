@@ -74,25 +74,7 @@ namespace MarkdownDeep
 				dest.Append("</p>\n");
 			}
 		}
-        public string GetDataPosHtmlAttribute(Markdown m,int start,int len, GlobalPositionHint hint)
-        {
-            if (m.RenderPos == false) return "";
-
-            if (hint == null) return "";
-
-            int pos = hint.GetGlobalPosAt(start);
-
-            return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
-        }
-        public string GetDataPosHtmlAttribute(Token t)
-        {
-            if (t == null) return "";
-            if (t.hint == null) return "";
-            int pos = t.hint.GetGlobalPosAt(t.startOffset);
-            int len = t.length;
-
-            return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
-        }
+        
         internal void Format(StringBuilder dest, string str, GlobalPositionHint hint = null)
 		{
 			Format(dest, str, 0, str.Length, hint);
@@ -268,7 +250,7 @@ namespace MarkdownDeep
 					{
 						FootnoteReference r=(FootnoteReference)t.data;
                         sb.Append("<sup");
-                        sb.Append(GetDataPosHtmlAttribute(t));
+                        sb.Append(GetDataPosHtmlAttribute(t.startOffset, str));
                         sb.Append(" id=\"fnref:");
 						sb.Append(r.id);
 						sb.Append("\"><a href=\"#fn:");
@@ -282,8 +264,8 @@ namespace MarkdownDeep
 					case TokenType.abbreviation:
 					{
 						Abbreviation a = (Abbreviation)t.data;
-						sb.Append("<abbr");
-                        sb.Append(GetDataPosHtmlAttribute(t));
+                        sb.Append("<abbr");
+                        sb.Append(GetDataPosHtmlAttribute(t.startOffset, str));
 						if (!String.IsNullOrEmpty(a.Title))
 						{
 							sb.Append(" title=\"");
@@ -483,6 +465,19 @@ namespace MarkdownDeep
 						break;
 					}
 
+					case '\n':
+					{
+						if (m_Markdown.GfmOptions.Linebreaks)
+						{
+							if (!eof)
+							{
+								SkipEol();
+								token = CreateToken(TokenType.br, end_text_token, 0);
+							}
+						}
+						break;
+					}
+
 					case '\\':
 					{
 						// Special handling for escaping <autolinks>
@@ -643,7 +638,7 @@ namespace MarkdownDeep
 				return CreateToken(TokenType.closing_mark, savepos, position - savepos);
 			}
 
-			if (m_Markdown.ExtraMode && ch == '_' && (Char.IsLetterOrDigit(current)))
+			if (m_Markdown.ExtraMode && ch == '_')
 				return null;
 
 			return CreateToken(TokenType.internal_mark, savepos, position - savepos);
@@ -977,6 +972,9 @@ namespace MarkdownDeep
 			if (!SkipChar('['))
 				return null;
 
+			// Check for second '[' for [[Link]] type links
+			bool doubleBracketed = m_Markdown.GfmOptions.DoubleSquareBracketLinks && SkipChar('[');
+
 			// Is it a foonote?
 			var savepos=position;
 			if (m_Markdown.ExtraMode && token_type==TokenType.link && SkipChar('^'))
@@ -1036,6 +1034,36 @@ namespace MarkdownDeep
 			// The closing ']'
 			SkipForward(1);
 
+			// The second closing ']' for [[Link]] links
+			if (doubleBracketed)
+			{
+				if (SkipChar(']'))
+				{
+					var parts = link_text.Split('|');
+					var url = parts.Length > 1 ? parts[1] : parts[0];
+					var title = parts[0];
+
+					if (m_Markdown.GfmOptions.AutoImageLinks && ((title.EndsWith(".png") || title.EndsWith(".jpg") || title.EndsWith(".gif"))))
+					{
+						var framed = (url == "frame");
+						url = title;
+						if (m_Markdown.GfmOptions.SpacesInLinks) url = url.Replace(' ', '-'); // TODO: Duplicating the ' ' to '-' logic
+						title = title.Substring(0, title.Length - 4);
+						return CreateToken(TokenType.img, new LinkInfo(new LinkDefinition(null, url, null), title, framed ? "frame" : null));
+					}
+
+					// TODO: Should use LinkDefinition.ParseLinkTarget, as we are duplicating the ' ' to '-' logic, but not sure how to do that
+					if (m_Markdown.GfmOptions.SpacesInLinks) url = url.Replace(' ', '-');
+					var link_def = new LinkDefinition(null, url, null);
+					return CreateToken(token_type, new LinkInfo(link_def, title));
+				}
+				else
+				{
+					position = savepos;
+					return null;
+				}
+			}
+
 			// Save position in case we need to rewind
 			savepos = position;
 
@@ -1043,7 +1071,7 @@ namespace MarkdownDeep
 			if (SkipChar('('))
 			{
 				// Extract the url and title
-				var link_def = LinkDefinition.ParseLinkTarget(this, null, m_Markdown.ExtraMode);
+                var link_def = LinkDefinition.ParseLinkTarget(this, null, m_Markdown.ExtraMode, m_Markdown.GfmOptions.SpacesInLinks);
 				if (link_def==null)
 					return null;
 
@@ -1201,5 +1229,40 @@ namespace MarkdownDeep
 		Markdown m_Markdown;
 		internal bool DisableLinks;
 		List<Token> m_Tokens=new List<Token>();
+
+        public string GetDataPosHtmlAttribute(Markdown m, int start, int len, GlobalPositionHint hint)
+        {
+            if (m.RenderPos == false) return "";
+
+            if (hint == null) return "";
+
+            int pos = hint.GetGlobalPosAt(start);
+            if (pos <= 0) return "";
+
+            return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
+        }
+        public string GetDataPosHtmlAttribute(Token t)
+        {
+            if (t == null) return "";
+            if (t.hint == null) return "";
+            int pos = t.hint.GetGlobalPosAt(t.startOffset);
+            int len = t.length;
+            if (pos <= 0) return "";
+
+            return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
+        }
+        public string GetDataPosHtmlAttribute(int pos,string buf)
+        {
+            if (this.m_Markdown.RenderPos == false) return "";
+
+            if (this.hint == null) return "";
+
+            int dPos = hint.GetGlobalPosAt(pos);
+
+            if (dPos <= 0) return "";
+
+            return " data-pos='" + dPos.ToString() + "'";
+        }
+        
 	}
 }

@@ -134,7 +134,10 @@ namespace MarkdownDeep
 							prevline.RevertToPlain();
 							prevline.blockType = b.blockType == BlockType.post_h1 ? BlockType.h1 : BlockType.h2;
 							blocks.Add(prevline);
-							continue;
+
+                            blocks.Add(b); // === をブロックに追加
+							
+                            continue;
 						}
 					}
 
@@ -998,6 +1001,7 @@ namespace MarkdownDeep
 									span.blockType = BlockType.span;
 									span.contentStart = inner_pos;
 									span.contentLen = tagpos - inner_pos;
+									span.lineStart = inner_pos;
                                     span.hint = hint;
 
 									b.children = new List<Block>();
@@ -1028,6 +1032,7 @@ namespace MarkdownDeep
 										span.blockType = BlockType.html;
 										span.contentStart = inner_pos;
 										span.contentLen = tagpos - inner_pos;
+										span.lineStart = inner_pos;
                                         span.hint = b.hint;
 										b.children = new List<Block>();
 										b.children.Add(span);
@@ -1525,8 +1530,14 @@ namespace MarkdownDeep
 
 			// Rest of line must be blank
 			SkipLinespace();
+			var lang = string.Empty;
 			if (!eol)
-				return false;
+			{
+                // process language
+                Mark();
+                SkipToEol();
+                lang = Extract();
+            }
 
 			// Skip the eol and remember start of code
 			SkipEol();
@@ -1553,6 +1564,7 @@ namespace MarkdownDeep
 			// Create the code block
 			b.blockType = BlockType.codeblock;
 			b.children = new List<Block>();
+            b.codeBlockLang = lang;
 
 			// Remove the trailing line end
 			if (input[endCode - 1] == '\r' && input[endCode - 2] == '\n')

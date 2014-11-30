@@ -322,6 +322,9 @@ namespace MarkdownDeep
 						if (!p.Find('\"'))
 							return null;
 
+                        if (tag.m_attributes.ContainsKey(attributeName))
+                            return null; // invalid html (error case 1)
+
 						// Store the value
 						tag.m_attributes.Add(attributeName, p.Extract());
 
@@ -338,12 +341,19 @@ namespace MarkdownDeep
 						if (!p.eof)
 						{
 							// Store the value
+
+                            if (tag.m_attributes.ContainsKey(attributeName))
+                                return null; // invalid html (error case 2)
+
 							tag.m_attributes.Add(attributeName, p.Extract());
 						}
 					}
 				}
 				else
 				{
+                    if (tag.m_attributes.ContainsKey(attributeName))
+                        return null; // invalid html (error case 3)
+
 					tag.m_attributes.Add(attributeName, "");
 				}
 			}

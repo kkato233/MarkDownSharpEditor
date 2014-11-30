@@ -30,14 +30,10 @@ namespace MarkdownDeep
 		}
 
 
-		internal void FormatParagraph(StringBuilder dest, Block b)
+        internal void FormatParagraph(StringBuilder dest, string str, int start, int len, GlobalPositionHint hint = null)
 		{
-            string str = b.buf;
-            int start = b.contentStart;
-            int len = b.contentLen;
-
 			// Parse the string into a list of tokens
-			Tokenize(str, start, len, b.blockRange);
+			Tokenize(str, start, len);
 
 			// Titled image?
 			if (m_Tokens.Count == 1 && m_Markdown.HtmlClassTitledImages != null && m_Tokens[0].type == TokenType.img)
@@ -59,8 +55,8 @@ namespace MarkdownDeep
 				// Render the title
 				if (!String.IsNullOrEmpty(li.def.title))
 				{
-					dest.Append("<p");
-                    dest.Append(b.GetDataPosHtmlAttribute(m_Markdown));
+                    dest.Append("<p");
+                    dest.Append(GetDataPosHtmlAttribute(m_Markdown,start,len,hint));
                     dest.Append(">");
 					Utils.SmartHtmlEncodeAmpsAndAngles(dest, li.def.title);
 					dest.Append("</p>\n");
@@ -72,65 +68,50 @@ namespace MarkdownDeep
 			{
 				// Render the paragraph
                 dest.Append("<p");
-                dest.Append(b.GetDataPosHtmlAttribute(m_Markdown));
+                dest.Append(GetDataPosHtmlAttribute(m_Markdown, start, len, hint));
                 dest.Append(">");
 				Render(dest, str);
 				dest.Append("</p>\n");
 			}
-
-            AddTokenBlockRange(b);
 		}
+        public string GetDataPosHtmlAttribute(Markdown m,int start,int len, GlobalPositionHint hint)
+        {
+            if (m.RenderPos == false) return "";
 
-		internal void Format(StringBuilder dest, string str, BlockRange range = null)
+            if (hint == null) return "";
+
+            int pos = hint.GetGlobalPosAt(start);
+
+            return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
+        }
+        public string GetDataPosHtmlAttribute(Token t)
+        {
+            if (t == null) return "";
+            if (t.hint == null) return "";
+            int pos = t.hint.GetGlobalPosAt(t.startOffset);
+            int len = t.length;
+
+            return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
+        }
+        internal void Format(StringBuilder dest, string str, GlobalPositionHint hint = null)
 		{
-            // Parse the string into a list of tokens
-            Tokenize(str, 0, str.Length, range);
-
-            // Render all tokens
-            Render(dest, str);
+			Format(dest, str, 0, str.Length, hint);
 		}
 
 		// Format a range in an input string and write it to the destination string builder.
-		internal void Format(StringBuilder dest, Block b)
+		internal void Format(StringBuilder dest, string str, int start, int len, GlobalPositionHint hint = null)
 		{
 			// Parse the string into a list of tokens
-			Tokenize(b.buf,b.contentStart,b.contentLen,b.blockRange);
+			Tokenize(str, start, len, hint);
 
 			// Render all tokens
-			Render(dest, b.buf);
-
-            AddTokenBlockRange(b);
+			Render(dest, str, hint);
 		}
 
-        /// <summary>
-        /// Block の BlockRange の中に Token の詳細情報を入れる
-        /// </summary>
-        /// <param name="b"></param>
-        private void AddTokenBlockRange(Block b)
-        {
-            if (b == null || b.blockRange == null) return;
-
-            foreach (var token in this.m_Tokens)
-            {
-                var list = b.blockRange.GetRange(token.startOffset,token.length);
-                foreach(var item in list) {
-                    var t = new BlockRange.TokenRangeItem()
-                    {
-                        buf = b.buf,
-                        blockType = b.blockType,
-                        tokenType = token.type,
-                        start = item.start,
-                        len = item.len,
-                    };
-                    b.blockRange.Tokens.Add(t);
-                }
-            }
-        }
-
-		internal void FormatPlain(StringBuilder dest, string str, int start, int len)
+		internal void FormatPlain(StringBuilder dest, string str, int start, int len, GlobalPositionHint hint = null)
 		{
 			// Parse the string into a list of tokens
-			Tokenize(str, start, len);
+			Tokenize(str, start, len, hint);
 
 			// Render all tokens
 			RenderPlain(dest, str);
@@ -138,10 +119,10 @@ namespace MarkdownDeep
 
 		// Format a string and return it as a new string
 		// (used in formatting the text of links)
-		internal string Format(string str,BlockRange range = null)
+        internal string Format(string str, GlobalPositionHint hint = null)
 		{
 			StringBuilder dest = new StringBuilder();
-			Format(dest, str, range);
+			Format(dest, str, 0, str.Length, hint);
 			return dest.ToString();
 		}
 
@@ -208,7 +189,7 @@ namespace MarkdownDeep
 		}
 
 		// Render a list of tokens to a destinatino string builder.
-		private void Render(StringBuilder sb, string str)
+		private void Render(StringBuilder sb, string str, GlobalPositionHint hint = null)
 		{
 			foreach (Token t in m_Tokens)
 			{
@@ -216,12 +197,12 @@ namespace MarkdownDeep
 				{
 					case TokenType.Text:
 						// Append encoded text
-						m_Markdown.HtmlEncode(sb, str, t.startOffset, t.length);
+						m_Markdown.HtmlEncode(sb, str, t.startOffset, t.length, t.hint);
 						break;
 
 					case TokenType.HtmlTag:
 						// Append html as is
-						Utils.SmartHtmlEncodeAmps(sb, str, t.startOffset, t.length);
+						Utils.SmartHtmlEncodeAmps(sb, str, t.startOffset, t.length, t.hint);
 						break;
 
 					case TokenType.Html:
@@ -260,7 +241,7 @@ namespace MarkdownDeep
 						sb.Append("<code");
                         sb.Append(GetDataPosHtmlAttribute(t));
                         sb.Append(">");
-						m_Markdown.HtmlEncode(sb, str, t.startOffset, t.length);
+						m_Markdown.HtmlEncode(sb, str, t.startOffset, t.length, t.hint);
 						sb.Append("</code>");
 						break;
 
@@ -270,16 +251,16 @@ namespace MarkdownDeep
 						var sf = new SpanFormatter(m_Markdown);
 						sf.DisableLinks = true;
 
-                        string posAttribute = this.GetDataPosHtmlAttribute(t);
-                        li.def.RenderLink(m_Markdown, sb, sf.Format(li.link_text), posAttribute);
+                        string posAttribute = GetDataPosHtmlAttribute(t);
+                        li.def.RenderLink(m_Markdown, sb, sf.Format(li.link_text, t.hint), posAttribute);
 						break;
 					}
 
 					case TokenType.img:
 					{
 						LinkInfo li = (LinkInfo)t.data;
-                        string posAttribute = this.GetDataPosHtmlAttribute(t);
-                        li.def.RenderImg(m_Markdown, sb, li.link_text, optionAttributes: posAttribute);
+                        string posAttribute = GetDataPosHtmlAttribute(t);
+						li.def.RenderImg(m_Markdown, sb, li.link_text, t.hint, optionAttributes: posAttribute);
 						break;
 					}
 
@@ -301,7 +282,7 @@ namespace MarkdownDeep
 					case TokenType.abbreviation:
 					{
 						Abbreviation a = (Abbreviation)t.data;
-                        sb.Append("<abbr");
+						sb.Append("<abbr");
                         sb.Append(GetDataPosHtmlAttribute(t));
 						if (!String.IsNullOrEmpty(a.Title))
 						{
@@ -377,10 +358,10 @@ namespace MarkdownDeep
 		}
 
 		// Scan the input string, creating tokens for anything special 
-		public void Tokenize(string str, int start, int len, BlockRange range = null)
+		public void Tokenize(string str, int start, int len, GlobalPositionHint hint = null)
 		{
 			// Prepare
-			base.Reset(str, start, len, range);
+			base.Reset(str, start, len, hint);
 			m_Tokens.Clear();
 
 			List<Token> emphasis_marks = null;
@@ -435,14 +416,8 @@ namespace MarkdownDeep
 
 						// Rewind if invalid syntax
 						// (the '[' or '!' will be treated as a regular character and processed below)
-						if (token == null) {
+						if (token == null)
 							position = linkpos;
-                        }
-                        else
-                        {
-                            token.startOffset = linkpos;
-                            token.length = position - linkpos;
-                        }
 						break;
 					}
 
@@ -499,19 +474,6 @@ namespace MarkdownDeep
 							SkipForward(2);
 
 							// Don't put br's at the end of a paragraph
-							if (!eof)
-							{
-								SkipEol();
-								token = CreateToken(TokenType.br, end_text_token, 0);
-							}
-						}
-						break;
-					}
-
-					case '\n':
-					{
-						if (m_Markdown.GfmOptions.Linebreaks)
-						{
 							if (!eof)
 							{
 								SkipEol();
@@ -681,7 +643,7 @@ namespace MarkdownDeep
 				return CreateToken(TokenType.closing_mark, savepos, position - savepos);
 			}
 
-			if (m_Markdown.ExtraMode && ch == '_')
+			if (m_Markdown.ExtraMode && ch == '_' && (Char.IsLetterOrDigit(current)))
 				return null;
 
 			return CreateToken(TokenType.internal_mark, savepos, position - savepos);
@@ -992,7 +954,7 @@ namespace MarkdownDeep
 					if (li!=null)
 					{
 						SkipForward(1);
-						return CreateToken(TokenType.link, li);
+						return CreateToken(TokenType.link, li, hint);
 					}
 
 					return null;
@@ -1014,9 +976,6 @@ namespace MarkdownDeep
 			// Opening '['
 			if (!SkipChar('['))
 				return null;
-
-			// Check for second '[' for [[Link]] type links
-			bool doubleBracketed = m_Markdown.GfmOptions.DoubleSquareBracketLinks && SkipChar('[');
 
 			// Is it a foonote?
 			var savepos=position;
@@ -1077,36 +1036,6 @@ namespace MarkdownDeep
 			// The closing ']'
 			SkipForward(1);
 
-			// The second closing ']' for [[Link]] links
-			if (doubleBracketed)
-			{
-				if (SkipChar(']'))
-				{
-					var parts = link_text.Split('|');
-					var url = parts.Length > 1 ? parts[1] : parts[0];
-					var title = parts[0];
-
-					if (m_Markdown.GfmOptions.AutoImageLinks && ((title.EndsWith(".png") || title.EndsWith(".jpg") || title.EndsWith(".gif"))))
-					{
-						var framed = (url == "frame");
-						url = title;
-						if (m_Markdown.GfmOptions.SpacesInLinks) url = url.Replace(' ', '-'); // TODO: Duplicating the ' ' to '-' logic
-						title = title.Substring(0, title.Length - 4);
-						return CreateToken(TokenType.img, new LinkInfo(new LinkDefinition(null, url, null), title, framed ? "frame" : null));
-					}
-
-					// TODO: Should use LinkDefinition.ParseLinkTarget, as we are duplicating the ' ' to '-' logic, but not sure how to do that
-					if (m_Markdown.GfmOptions.SpacesInLinks) url = url.Replace(' ', '-');
-					var link_def = new LinkDefinition(null, url, null);
-					return CreateToken(token_type, new LinkInfo(link_def, title));
-				}
-				else
-				{
-					position = savepos;
-					return null;
-				}
-			}
-
 			// Save position in case we need to rewind
 			savepos = position;
 
@@ -1114,7 +1043,7 @@ namespace MarkdownDeep
 			if (SkipChar('('))
 			{
 				// Extract the url and title
-				var link_def = LinkDefinition.ParseLinkTarget(this, null, m_Markdown.ExtraMode, m_Markdown.GfmOptions.SpacesInLinks);
+				var link_def = LinkDefinition.ParseLinkTarget(this, null, m_Markdown.ExtraMode);
 				if (link_def==null)
 					return null;
 
@@ -1228,7 +1157,7 @@ namespace MarkdownDeep
 		#region Token Pooling
 
 		// CreateToken - create or re-use a token object
-		internal Token CreateToken(TokenType type, int startOffset, int length)
+		internal Token CreateToken(TokenType type, int startOffset, int length, GlobalPositionHint hint = null)
 		{
 			if (m_SpareTokens.Count != 0)
 			{
@@ -1237,14 +1166,15 @@ namespace MarkdownDeep
 				t.startOffset = startOffset;
 				t.length = length;
 				t.data = null;
+                t.hint = hint;
 				return t;
 			}
 			else
-				return new Token(type, startOffset, length);
+				return new Token(type, startOffset, length, hint);
 		}
 
 		// CreateToken - create or re-use a token object
-		internal Token CreateToken(TokenType type, object data)
+		internal Token CreateToken(TokenType type, object data, GlobalPositionHint hint = null)
 		{
 			if (m_SpareTokens.Count != 0)
 			{
@@ -1271,85 +1201,5 @@ namespace MarkdownDeep
 		Markdown m_Markdown;
 		internal bool DisableLinks;
 		List<Token> m_Tokens=new List<Token>();
-
-
-        /// <summary>
-        /// Token の開始と終了の情報を取得する
-        /// </summary>
-        /// <param name="t"></param>
-        /// <param name="buf"></param>
-        /// <returns></returns>
-        public string GetDataPosHtmlAttribute(Token t)
-        {
-            if (this.m_Markdown.RenderPos == false) return "";
-
-            if (this.blockRange == null) return "";
-
-            string buf = this.input;
-            if (this.blockRange != null && this.blockRange.Items.Any())
-            {
-                buf = this.blockRange.Items.First().buf;
-            }
-            else if (this.blockRange != null && this.blockRange.Tokens.Any())
-            {
-                buf = this.blockRange.Tokens.First().buf;
-            }
-
-            int pos = t.startOffset;
-
-            Token endT = t;
-
-            // 開始位置
-            int? dPos = this.blockRange.GetIndexOf(pos, buf);
-
-            // 終了位置
-            if (t.type == TokenType.open_em || t.type == TokenType.open_strong || t.type == TokenType.opening_mark)
-            {
-                endT = FindEndToken(m_Tokens, t);
-            }
-            int? dPos2 = null;
-            if (endT != null)
-            {
-                dPos2 = this.blockRange.GetIndexOf(endT.startOffset + endT.length, buf);
-            }
-            if (dPos == null || dPos2 == null) return "";
-
-            int len = dPos2.Value - dPos.Value;
-
-            return " data-pos='" + dPos.ToString() + "' data-len='" + len.ToString() + "'";
-        }
-
-        /// <summary>
-        /// 対応する token の終了を探す
-        /// </summary>
-        /// <param name="m_Tokens"></param>
-        /// <param name="t"></param>
-        /// <returns></returns>
-        private Token FindEndToken(List<Token> list, Token t)
-        {
-            int startIndex = list.IndexOf(t);
-            if (startIndex < 0) return null;
-
-            TokenType findType;
-            if (t.type == TokenType.open_em)
-            {
-                findType = TokenType.close_em;
-            }
-            else if (t.type == TokenType.open_strong)
-            {
-                findType = TokenType.close_strong;
-            }
-            else if (t.type == TokenType.opening_mark)
-            {
-                findType = TokenType.closing_mark;
-            }
-            else
-            {
-                return null;
-            }
-            Token endToken = list.Skip(startIndex).Where(r => r.type == findType).FirstOrDefault();
-
-            return endToken;
-        }
 	}
 }

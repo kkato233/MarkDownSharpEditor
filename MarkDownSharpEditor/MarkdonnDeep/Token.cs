@@ -31,7 +31,7 @@ namespace MarkdownDeep
 	 */
 
 	// TokenType - what sort of token?
-	public enum TokenType
+	internal enum TokenType
 	{
 		Text,			// Plain text, should be htmlencoded
 		HtmlTag,		// Valid html tag, write out directly but escape &amps;
@@ -58,11 +58,12 @@ namespace MarkdownDeep
 	internal class Token
 	{
 		// Constructor
-		public Token(TokenType type, int startOffset, int length)
+		public Token(TokenType type, int startOffset, int length,GlobalPositionHint hint = null)
 		{
 			this.type = type;
 			this.startOffset = startOffset;
 			this.length = length;
+            this.hint = hint;
 		}
 
 		// Constructor
@@ -88,6 +89,7 @@ namespace MarkdownDeep
 		public int startOffset;
 		public int length;
 		public object data;
+        public GlobalPositionHint hint;
 	}
 
 }

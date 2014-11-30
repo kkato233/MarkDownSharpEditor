@@ -58,7 +58,7 @@ namespace MarkdownDeep
 		}
 
 
-		internal void RenderLink(Markdown m, StringBuilder b, string link_text, string posAttribute)
+        internal void RenderLink(Markdown m, StringBuilder b, string link_text, string posAttribute)
 		{
 			if (url.StartsWith("mailto:"))
 			{
@@ -97,14 +97,14 @@ namespace MarkdownDeep
 				m.OnPrepareLink(tag);
 
 				// Render the opening tag
-                tag.RenderOpening(b, posAttribute);
+				tag.RenderOpening(b);
 
 				b.Append(link_text);	  // Link text already escaped by SpanFormatter
 				b.Append("</a>");
 			}
 		}
 
-		internal void RenderImg(Markdown m, StringBuilder b, string alt_text, string cssClass = null, string optionAttributes = null)
+		internal void RenderImg(Markdown m, StringBuilder b, string alt_text,GlobalPositionHint hint = null, string cssClass = null, string optionAttributes = null)
 		{
 			HtmlTag tag = new HtmlTag("img");
 
@@ -128,7 +128,7 @@ namespace MarkdownDeep
 				Utils.SmartHtmlEncodeAmpsAndAngles(sb, title);
 				tag.attributes["title"] = sb.ToString();
 			}
-
+            
 			if (!String.IsNullOrEmpty(cssClass))
 			{
 				tag.attributes["class"] = cssClass;
@@ -138,29 +138,29 @@ namespace MarkdownDeep
 
 			m.OnPrepareImage(tag, m.RenderingTitledImage);
 
-            tag.RenderOpening(b, optionAttributes);
+			tag.RenderOpening(b, optionAttributes);
 		}
 
 
 		// Parse a link definition from a string (used by test cases)
-		internal static LinkDefinition ParseLinkDefinition(string str, bool ExtraMode, bool allowSpacesInUrl = false)
+		internal static LinkDefinition ParseLinkDefinition(string str, bool ExtraMode)
 		{
 			StringScanner p = new StringScanner(str);
-			return ParseLinkDefinitionInternal(p, ExtraMode, allowSpacesInUrl);
+			return ParseLinkDefinitionInternal(p, ExtraMode);
 		}
 
 		// Parse a link definition
-        internal static LinkDefinition ParseLinkDefinition(StringScanner p, bool ExtraMode, bool allowSpacesInUrl = false)
+		internal static LinkDefinition ParseLinkDefinition(StringScanner p, bool ExtraMode)
 		{
 			int savepos=p.position;
-			var l = ParseLinkDefinitionInternal(p, ExtraMode, allowSpacesInUrl);
+			var l = ParseLinkDefinitionInternal(p, ExtraMode);
 			if (l==null)
 				p.position = savepos;
 			return l;
 
 		}
 
-		internal static LinkDefinition ParseLinkDefinitionInternal(StringScanner p, bool ExtraMode, bool allowSpacesInUrl)
+		internal static LinkDefinition ParseLinkDefinitionInternal(StringScanner p, bool ExtraMode)
 		{
 			// Skip leading white space
 			p.SkipWhitespace();
@@ -180,7 +180,7 @@ namespace MarkdownDeep
 				return null;
 
 			// Parse the url and title
-			var link=ParseLinkTarget(p, id, ExtraMode, allowSpacesInUrl);
+			var link=ParseLinkTarget(p, id, ExtraMode);
 
 			// and trailing whitespace
 			p.SkipLinespace();
@@ -195,7 +195,7 @@ namespace MarkdownDeep
 		// Parse just the link target
 		// For reference link definition, this is the bit after "[id]: thisbit"
 		// For inline link, this is the bit in the parens: [link text](thisbit)
-		internal static LinkDefinition ParseLinkTarget(StringScanner p, string id, bool ExtraMode, bool allowSpacesInUrl)
+		internal static LinkDefinition ParseLinkTarget(StringScanner p, string id, bool ExtraMode)
 		{
 			// Skip whitespace
 			p.SkipWhitespace();
@@ -239,7 +239,7 @@ namespace MarkdownDeep
 				while (!p.eol)
 				{
 					char ch=p.current;
-					if (char.IsWhiteSpace(ch) && (ch != ' ' || (ch == ' ' && !allowSpacesInUrl)))
+					if (char.IsWhiteSpace(ch))
 						break;
 					if (id == null)
 					{
@@ -256,9 +256,7 @@ namespace MarkdownDeep
 					p.SkipEscapableChar(ExtraMode);
 				}
 
-				var url = p.Extract().Trim();
-				if (allowSpacesInUrl) url = url.Replace(' ', '-');
-				r.url = Utils.UnescapeString(url, ExtraMode);
+				r.url = Utils.UnescapeString(p.Extract().Trim(), ExtraMode);
 			}
 
 			p.SkipLinespace();

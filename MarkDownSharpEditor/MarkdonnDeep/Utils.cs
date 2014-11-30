@@ -237,7 +237,7 @@ namespace MarkdownDeep
 
 
 		// Like HtmlEncode, but only escape &'s that don't look like html entities
-		public static void SmartHtmlEncodeAmps(StringBuilder dest, string str, int startOffset, int len)
+		public static void SmartHtmlEncodeAmps(StringBuilder dest, string str, int startOffset, int len, GlobalPositionHint hint = null)
 		{
 			int end = startOffset + len;
 			for (int i = startOffset; i < end; i++)

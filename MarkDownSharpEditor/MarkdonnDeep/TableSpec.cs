@@ -42,6 +42,8 @@ namespace MarkdownDeep
 
 		public List<string> ParseRow(StringScanner p)
 		{
+            // TODO: 新規クラス TableRow を作成して 文字＋位置情報を設定して返す
+
 			p.SkipLinespace();
 
 			if (p.eol)
@@ -63,7 +65,7 @@ namespace MarkdownDeep
 				// Find the next vertical bar
 				p.Mark();
 				while (!p.eol && p.current != '|')
-					p.SkipForward(1);
+					p.SkipEscapableChar(true);
 
 				row.Add(p.Extract().Trim());
 

@@ -21,7 +21,7 @@ namespace MarkdownDeep
 {
 	// Some block types are only used during block parsing, some
 	// are only used during rendering and some are used during both
-	public enum BlockType
+	internal enum BlockType
 	{
 		Blank,			// blank line (parse only)
 		h1,				// headings (render and parse)
@@ -73,6 +73,7 @@ namespace MarkdownDeep
 		{
 			get
 			{
+                // TODO: オリジナルの文字の位置を示す Hint も同時に作成する Content が欲しい ContentAndHint 
 				switch (blockType)
 				{
 					case BlockType.codeblock:
@@ -120,7 +121,7 @@ namespace MarkdownDeep
 		internal string ResolveHeaderID(Markdown m)
 		{
 			// Already resolved?
-			if (this.data!=null)
+			if (this.data!=null && this.data is string)
 				return (string)this.data;
 
 			// Approach 1 - PHP Markdown Extra style header id
@@ -148,11 +149,11 @@ namespace MarkdownDeep
 					return;
 
 				case BlockType.p:
-					m.SpanFormatter.FormatParagraph(b, this);
+					m.SpanFormatter.FormatParagraph(b, buf, contentStart, contentLen, hint);
 					break;
 
 				case BlockType.span:
-                    m.SpanFormatter.Format(b, this);
+					m.SpanFormatter.Format(b, buf, contentStart, contentLen, hint);
 					b.Append("\n");
 					break;
 
@@ -182,7 +183,7 @@ namespace MarkdownDeep
 					{
 						b.Append("<" + blockType.ToString() + ">");
 					}
-					m.SpanFormatter.Format(b, this);
+					m.SpanFormatter.Format(b, buf, contentStart, contentLen, hint);
 					b.Append("</" + blockType.ToString() + ">\n");
 					break;
 
@@ -200,7 +201,7 @@ namespace MarkdownDeep
 					b.Append("<li");
                     b.Append(this.GetDataPosHtmlAttribute(m));
                     b.Append(">");
-					m.SpanFormatter.Format(b, this);
+                    m.SpanFormatter.Format(b, buf, contentStart, contentLen, hint);
 					b.Append("</li>\n");
 					break;
 
@@ -214,7 +215,7 @@ namespace MarkdownDeep
 						RenderChildren(m, b);
 					}
 					else
-						m.SpanFormatter.Format(b, this);
+                        m.SpanFormatter.Format(b, buf, contentStart, contentLen, hint);
 					b.Append("</dd>\n");
 					break;
 
@@ -253,7 +254,7 @@ namespace MarkdownDeep
 					return;
 
 				case BlockType.unsafe_html:
-					m.HtmlEncode(b, buf, contentStart, contentLen);
+					m.HtmlEncode(b, buf, contentStart, contentLen, hint);
 					return;
 
 				case BlockType.codeblock:
@@ -262,7 +263,7 @@ namespace MarkdownDeep
 						var sb = new StringBuilder();
 						foreach (var line in children)
 						{
-							m.HtmlEncodeAndConvertTabsToSpaces(sb, line.buf, line.contentStart, line.contentLen);
+							m.HtmlEncodeAndConvertTabsToSpaces(sb, line.buf, line.contentStart, line.contentLen, line.hint);
 							sb.Append("\n");
 						}
 						b.Append(m.FormatCodeBlock(m, sb.ToString()));
@@ -274,7 +275,7 @@ namespace MarkdownDeep
                         b.Append("><code>");
 						foreach (var line in children)
 						{
-							m.HtmlEncodeAndConvertTabsToSpaces(b, line.buf, line.contentStart, line.contentLen);
+							m.HtmlEncodeAndConvertTabsToSpaces(b, line.buf, line.contentStart, line.contentLen, line.hint);
 							b.Append("\n");
 						}
 						b.Append("</code></pre>\n\n");
@@ -350,7 +351,7 @@ namespace MarkdownDeep
                     b.Append(">");
 					if (contentLen > 0)
 					{
-						m.SpanFormatter.Format(b, this);
+                        m.SpanFormatter.Format(b, buf, contentStart, contentLen, hint);
 						b.Append("&nbsp;");
 					}
 					b.Append((string)data);
@@ -365,7 +366,7 @@ namespace MarkdownDeep
 					b.Append("<" + blockType.ToString());
                     b.Append(this.GetDataPosHtmlAttribute(m));
                     b.Append(">");
-					m.SpanFormatter.Format(b, this);
+                    m.SpanFormatter.Format(b, buf, contentStart, contentLen, hint);
 					b.Append("</" + blockType.ToString() + ">\n");
 					break;
 			}
@@ -380,7 +381,7 @@ namespace MarkdownDeep
 
 				case BlockType.p:
 				case BlockType.span:
-					m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen);
+					m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen, hint);
 					b.Append(" ");
 					break;
 
@@ -390,7 +391,7 @@ namespace MarkdownDeep
 				case BlockType.h4:
 				case BlockType.h5:
 				case BlockType.h6:
-					m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen);
+					m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen, hint);
 					b.Append(" - ");
 					break;
 
@@ -398,7 +399,7 @@ namespace MarkdownDeep
 				case BlockType.ol_li:
 				case BlockType.ul_li:
 					b.Append("* ");
-					m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen);
+					m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen, hint);
 					b.Append(" ");
 					break;
 
@@ -409,13 +410,14 @@ namespace MarkdownDeep
 						RenderChildrenPlain(m, b);
 					}
 					else
-						m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen);
+						m.SpanFormatter.FormatPlain(b, buf, contentStart, contentLen, hint);
 					break;
 
 				case BlockType.dt:
 					{
 						if (children == null)
 						{
+                            // TODO: Content Split した時に Hint も分割する機能が必要
 							foreach (var l in Content.Split('\n'))
 							{
 								var str = l.Trim();
@@ -507,8 +509,7 @@ namespace MarkdownDeep
 			contentLen = other.contentLen;
 			lineStart = other.lineStart;
 			lineLen = other.lineLen;
-            blockRange = other.blockRange;
-
+            hint = other.hint;
 			return this;
 		}
 
@@ -520,203 +521,19 @@ namespace MarkdownDeep
 		internal int lineLen;
 		internal object data;			// content depends on block type
 		internal List<Block> children;
-
-
-        public bool IsUse = false;
-
-        public BlockRange blockRange;
-
-        public int? GetBlockStart(string markDown)
-        {
-            int pos = this.LineStart;
-
-            if (this.blockRange != null)
-            {
-                return this.blockRange.GetIndexOf(pos, markDown);
-            }
-
-            // 子要素の調査が不要
-            if (this.buf == markDown) return pos;
-
-            if (this.children != null)
-            {
-                var firstChild = this.children.FirstOrDefault();
-                if (firstChild != null)
-                {
-                    int? firstBlockStart = firstChild.GetBlockStart(markDown);
-                    return firstBlockStart;
-                }
-            }
-
-            if (this.contentStart == 0 && this.contentLen == 0) return 0;
-
-            return null;
-        }
-
-        public int? GetBlockEnd(string markDown)
-        {
-            int pos = this.contentEnd;
-
-            if (this.blockRange != null)
-            {
-                return this.blockRange.GetIndexOf(pos, markDown);
-            }
-
-            // 子要素の調査が不要
-            if (this.buf == markDown) return pos;
-
-            if (this.children != null)
-            {
-                var lastChild = this.children.LastOrDefault();
-                if (lastChild != null)
-                {
-                    int? lastBlockEnd = lastChild.GetBlockEnd(markDown);
-                    return lastBlockEnd;
-                }
-            }
-            return null;
-        }
+        internal GlobalPositionHint hint;
 
         public string GetDataPosHtmlAttribute(Markdown m)
         {
             if (m.RenderPos == false) return "";
 
-            int? pos = this.globalContentStart;
+            if (this.hint == null) return "";
 
+            int pos = this.hint.GetGlobalPosAt(this.contentStart);
             int len = this.contentLen;
-
-            if (pos == null || len == 0)
-            {
-                int? endPos = null;
-                if (this.children != null && this.children.Any())
-                {
-                    pos = GetFirstPos(this.children);
-                    endPos = GetLastPos(this.children);
-                }
-                else if (this.blockRange != null && this.blockRange.Items.Any())
-                {
-                    pos = GetFirstPos(this.blockRange);
-                    endPos = GetLastPos(this.blockRange);
-                }
-                if (endPos != null && pos != null)
-                {
-                    len = endPos.Value - pos.Value;
-                }
-
-                if (pos == null || len == 0) return "";
-            }
-
 
             return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
         }
 
-        private int? GetFirstPos(List<Block> list)
-        {
-            foreach (var item in list.Where(r => r.blockRange != null))
-            {
-                int? blockFirst = GetFirstPos(item.blockRange);
-                if (blockFirst != null)
-                {
-                    return blockFirst;
-                }
-            }
-            return null;
-        }
-
-        private int? GetFirstPos(BlockRange blockRange)
-        {
-            int offset = 0;
-            for (int i = 0; i < blockRange.Items.Count; i++)
-            {
-                int? pos = blockRange.GetIndexOf(offset,this.buf);
-                if (pos != null)
-                {
-                    return pos;
-                }
-                offset = offset + blockRange.Items[i].len;
-            }
-            return null;
-        }
-
-        private int? GetLastPos(List<Block> list)
-        {
-            int pos = -1;
-            foreach (var item in list.Where(r => r.blockRange != null))
-            {
-                int? lastPos = item.globalContentEnd;
-                if (lastPos != null && lastPos.Value > pos)
-                {
-                    pos = lastPos.Value;
-                }
-            }
-            if (pos >= 0) {
-                return pos;
-            } else {
-                return null;
-            }
-        }
-
-        private int? GetLastPos(BlockRange range)
-        {
-            int offset = this.contentStart + this.contentLen;
-
-            for (int i = blockRange.Items.Count -1 ; i >= 0; i--)
-            {
-                int? pos = blockRange.GetIndexOf(offset, this.buf);
-                if (pos != null)
-                {
-                    return pos;
-                }
-                offset = offset - blockRange.Items[i].len;
-            }
-            return null;
-        }
-
-        public int? globalContentStart
-        {
-            get
-            {
-                if (this.blockRange != null && this.blockRange.Items.Any())
-                {
-                    string contentBuf = this.blockRange.Items.First().buf;
-                    return this.blockRange.GetIndexOf(contentStart, contentBuf);
-                }
-                if (this.blockRange != null && this.blockRange.Tokens.Any())
-                {
-                    string contentBuf = this.blockRange.Tokens.First().buf;
-                    return this.blockRange.GetIndexOf(contentStart, contentBuf);
-                }
-                else if (this.buf == null)
-                {
-                    return null;
-                }
-                else
-                {
-                    return contentStart;
-                }
-            }
-        }
-        public int ? globalContentEnd
-        {
-            get
-            {
-                if (this.blockRange != null)
-                {
-                    int pos = this.contentStart + this.contentLen;
-
-                    return this.blockRange.GetIndexOf(pos, this.buf);
-                }
-                else if (this.buf == null)
-                {
-                    return null;
-                }
-                else
-                {
-                    return this.contentStart + this.contentLen;
-                }
-            }
-        }
-
-        internal string codeBlockLang;
 	}
 }

@@ -43,13 +43,7 @@ namespace MarkdownDeep
 			m_Footnotes = new Dictionary<string, Block>();
 			m_UsedFootnotes = new List<Block>();
 			m_UsedHeaderIDs = new Dictionary<string, bool>();
-			GfmOptions = new GitFlavoredMarkdownOptions();
 		}
-
-        /// <summary>
-        /// Html を生成するときに data-pos="" でオリジナル文字の位置を HTMLに出力するか？というフラグ
-        /// </summary>
-        public bool RenderPos {get;set;}
 
 		internal List<Block> ProcessBlocks(string str)
 		{
@@ -62,7 +56,7 @@ namespace MarkdownDeep
 			m_AbbreviationList = null;
 
 			// Process blocks
-			return new BlockProcessor(this, MarkdownInHtml).Process(str);
+			return new BlockProcessor(this, MarkdownInHtml).Process(str,new GlobalPositionHint(str));
 		}
 		public string Transform(string str)
 		{
@@ -70,58 +64,11 @@ namespace MarkdownDeep
 			return Transform(str, out defs);
 		}
 
-        /// <summary>
-        /// 文字列を解析して 文字列の開始と終了ポイントを返す
-        /// </summary>
-        /// <param name="str"></param>
-        /// <returns></returns>
-        public BlockRange ProcessBlockRange(string str)
-        {
-            BlockRange range = new BlockRange();
-            var list = ProcessBlocks(str);
-            Dictionary<string, LinkDefinition> dic = new Dictionary<string, LinkDefinition>();
-            string s = Transform(list, out dic);
-
-            HashSet<BlockRange> rangeHash = new HashSet<BlockRange>();
-
-            foreach (var b in list)
-            {
-                if (b.lineStart == 0 && b.lineLen == 0)
-                {
-                    range.Append(b, b.contentStart, b.contentEnd);
-                }
-                else
-                {
-                    range.Append(b, b.lineStart, b.lineLen);
-                }
-                if (b.blockRange != null && rangeHash.Contains(b.blockRange) == false)
-                {
-
-                    // BlockType を正しく設定
-                    b.blockRange.Items.Where(r => r.buf == null).ToList().ForEach(r =>
-                    {
-                        r.buf = b.buf;
-                    });
-
-                    rangeHash.Add(b.blockRange);
-                    range.Tokens.AddRange(b.blockRange.Tokens);
-                }
-            }
-
-            return range;
-        }
-
 		// Transform a string
 		public string Transform(string str, out Dictionary<string, LinkDefinition> definitions)
 		{
-            // Build blocks
-            var blocks = ProcessBlocks(str);
-
-            return Transform(blocks, out definitions);
-        }
-
-        internal string Transform(List<Block> blocks, out Dictionary<string, LinkDefinition> definitions)
-        {
+			// Build blocks
+			var blocks = ProcessBlocks(str);
 
 			// Sort abbreviations by length, longest to shortest
 			if (m_AbbreviationMap != null)
@@ -283,15 +230,6 @@ namespace MarkdownDeep
 			set;
 		}
 
-		// Set to true to enable GitFlavoredMarkdownMode, which enables some
-		// of the Git Flavored Markdown features.
-		//  - 
-		public GitFlavoredMarkdownOptions GfmOptions
-		{
-			get;
-			set;
-		}
-
 		// When set, all html block level elements automatically support
 		// markdown syntax within them.  
 		// (Similar to Pandoc's handling of markdown in html)
@@ -378,6 +316,17 @@ namespace MarkdownDeep
 			set;
 		}
 
+        /// <summary>
+        /// Add the NoFollow attribute to all external links.
+        /// </summary>
+        public bool NoFollowExternalLinks
+        {
+            get;
+            set;
+        }
+
+
+
 		public Func<string, string> QualifyUrl;
 
 		// Override to qualify non-local image and link urls
@@ -393,6 +342,10 @@ namespace MarkdownDeep
 			// Quit if we don't have a base location
 			if (String.IsNullOrEmpty(UrlBaseLocation))
 				return url;
+
+            // Is the url a fragment?
+            if (url.StartsWith("#"))
+                return url;
 
 			// Is the url already fully qualified?
 			if (Utils.IsUrlFullyQualified(url))
@@ -513,6 +466,15 @@ namespace MarkdownDeep
 			{
 				tag.attributes["rel"] = "nofollow";
 			}
+
+            // No follow external links only
+            if (NoFollowExternalLinks)
+            {
+                if (Utils.IsUrlFullyQualified(url))
+                    tag.attributes["rel"] = "nofollow";
+            }
+ 		
+
 
 			// New window?
 			if ( (NewWindowForExternalLinks && Utils.IsUrlFullyQualified(url)) ||
@@ -851,9 +813,9 @@ namespace MarkdownDeep
 		}
 
 		// HtmlEncode a range in a string to a specified string builder
-		internal void HtmlEncode(StringBuilder dest, string str, int start, int len)
+		internal void HtmlEncode(StringBuilder dest, string str, int start, int len,GlobalPositionHint hint=null)
 		{
-			m_StringScanner.Reset(str, start, len);
+			m_StringScanner.Reset(str, start, len, hint);
 			var p = m_StringScanner;
 			while (!p.eof)
 			{
@@ -886,9 +848,9 @@ namespace MarkdownDeep
 
 
 		// HtmlEncode a string, also converting tabs to spaces (used by CodeBlocks)
-		internal void HtmlEncodeAndConvertTabsToSpaces(StringBuilder dest, string str, int start, int len)
+		internal void HtmlEncodeAndConvertTabsToSpaces(StringBuilder dest, string str, int start, int len,GlobalPositionHint hint = null)
 		{
-			m_StringScanner.Reset(str, start, len);
+			m_StringScanner.Reset(str, start, len, hint);
 			var p = m_StringScanner;
 			int pos = 0;
 			while (!p.eof)
@@ -1015,11 +977,6 @@ namespace MarkdownDeep
 
 		internal void FreeBlock(Block b)
 		{
-            if (b.blockRange != null) return; // このブロックは回収対象外
-            if (b.IsUse) return;
-
-            return;
-
 			m_SpareBlocks.Push(b);
 		}
 
@@ -1037,32 +994,7 @@ namespace MarkdownDeep
 		Dictionary<string, Abbreviation> m_AbbreviationMap;
 		List<Abbreviation> m_AbbreviationList;
 
+        public bool RenderPos { get; set; }
+    }
 
-	}
-
-	/// <summary>
-	/// A set of options to enable specific Git Flavored Markdown features.
-	/// </summary>
-	public class GitFlavoredMarkdownOptions
-	{
-		/// <summary>
-		/// Plain old newlines at the end of a line cause a Markdown line break.
-		/// </summary>
-		public bool Linebreaks { get; set; }
-
-		/// <summary>
-		/// Enable [[Link]] links, where "Link" is the text and the url.
-		/// </summary>
-		public bool DoubleSquareBracketLinks { get; set; }
-
-		/// <summary>
-		/// Convert spaces to dashes in links: [[hello world]] becomes [hello world](hello-world)
-		/// </summary>
-		public bool SpacesInLinks { get; set; }
-
-		/// <summary>
-		/// Convert [[image.png]] (or .gif or .jpg) to ![image](image.png)
-		/// </summary>
-		public bool AutoImageLinks { get; set; }
-	}
 }

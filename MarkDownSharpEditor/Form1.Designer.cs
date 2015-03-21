@@ -190,6 +190,7 @@
             this.azukiRichTextBox1.CaretMoved += new System.EventHandler(this.azukiRichTextBox1_CaretMoved);
             this.azukiRichTextBox1.VScroll += new System.EventHandler(this.richTextBox1_VScroll);
             this.azukiRichTextBox1.TextChanged += new System.EventHandler(this.richTextBox1_TextChanged);
+            this.azukiRichTextBox1.Click += new System.EventHandler(this.azukiRichTextBox1_Click);
             this.azukiRichTextBox1.Enter += new System.EventHandler(this.richTextBox1_Enter);
             this.azukiRichTextBox1.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.richTextBox1_KeyPress);
             this.azukiRichTextBox1.MouseClick += new System.Windows.Forms.MouseEventHandler(this.richTextBox1_MouseClick);

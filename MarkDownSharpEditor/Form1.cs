@@ -1902,7 +1902,24 @@ namespace MarkDownSharpEditor
             public int OffsetAbsDiff;
 #if DEBUG
             public string outerText;
+            
 #endif
+            public string ClassName
+            {
+                get
+                {
+                    return this._ClassName;
+                }
+            }
+            private string _ClassName;
+            internal void SetClassName(string strName)
+            {
+                this._ClassName = strName;
+                if (this.e != null)
+                {
+                    this.e.setAttribute("className", strName);
+                }
+            }
         }
 
         /// <summary>
@@ -2112,7 +2129,7 @@ namespace MarkDownSharpEditor
             // 一番近いタグのスタイル設定＆その他のスタイルのクリア
             foreach (var item in list)
             {
-                string strStyle = item.e.getAttribute("className") as string;
+                string strStyle = item.ClassName;
                 if (string.IsNullOrEmpty(strStyle) == false)
                 {
                     if (item == targetTag)
@@ -2120,19 +2137,17 @@ namespace MarkDownSharpEditor
                         // 変更しない
                         targetTag = null;
                     }
-                    else if (item != targetTag)
+                    else if (item != targetTag && targetTag != null &&
+                        string.IsNullOrEmpty(item.ClassName) == false)
                     {
-                        item.e.setAttribute("className", "");
+                        item.SetClassName("");
                     }
                 }
             }
             if (targetTag != null)
             {
-                IHTMLElement2 el = targetTag.e as IHTMLElement2;
-                if (el != null)
-                {
-                }
-                targetTag.e.setAttribute("className", "_mk");
+                //targetTag.e.setAttribute("className", "_mk");
+                targetTag.SetClassName("_mk");
             }
         }
 
@@ -2181,13 +2196,15 @@ namespace MarkDownSharpEditor
                     };
 
                     // offsetTop は body からの位置になるように補正
-                    IHTMLElement parentElement = e.parentElement;
-                    while(parentElement != null && 
-                         (string.Equals(parentElement.tagName,"body",StringComparison.OrdinalIgnoreCase) == false))
-                    {
-                        tag.OffsetTop = tag.OffsetTop + parentElement.offsetTop;
-                        parentElement = parentElement.parentElement;
-                    }
+                    //IHTMLElement parentElement = e.parentElement;
+                    //int loopN = 0;
+                    //while(parentElement != null && 
+                    //     (string.Equals(parentElement.tagName,"body",StringComparison.OrdinalIgnoreCase) == false))
+                    //{
+                    //    loopN++;
+                    //    tag.OffsetTop = tag.OffsetTop + parentElement.offsetTop;
+                    //    parentElement = parentElement.parentElement;
+                    //}
 #if DEBUG
                     tag.outerText = e.outerHTML;
 #endif
@@ -2208,6 +2225,11 @@ namespace MarkDownSharpEditor
                         {
                             tag.TextLen = len;
                         }
+                    }
+                    s = e.getAttribute("className") as string;
+                    if (string.IsNullOrEmpty(s) == false)
+                    {
+                        tag.SetClassName(s);
                     }
                     list.Add(tag);
                 }
@@ -4161,6 +4183,10 @@ namespace MarkDownSharpEditor
 		*/
 		#endregion
 
+        private void azukiRichTextBox1_Click(object sender, EventArgs e)
+        {
+            OnIdle_ScrollSyncToText();
+        }
 
 	}
 

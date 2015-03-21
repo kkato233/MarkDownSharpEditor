@@ -1885,7 +1885,7 @@ namespace MarkDownSharpEditor
                     if (this._OffsetHeight != null) return _OffsetHeight.Value;
                     if (this.e != null)
                     {
-                        this._OffsetHeight = e.offsetTop;
+                        this._OffsetHeight = e.offsetHeight;
                     }
                     return this._OffsetHeight.Value;
                 }

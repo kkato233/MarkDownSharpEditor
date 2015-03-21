@@ -1,0 +1,53 @@
+<Project 
+  DefaultTargets="Build;ReleaseCopy"
+  xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+      <ExeRelease>$(MSBuildProjectDirectory)\MarkDownSharpEditor\bin\Release</ExeRelease>
+      <LatestOutputDirectory>$(MSBuildProjectDirectory)\_workbench\latest</LatestOutputDirectory>
+  </PropertyGroup>
+    
+    <ItemGroup>
+        <MySourceFiles Include="$(ExeRelease)\**\*.*"/>
+    </ItemGroup>
+  
+  <ItemGroup>
+    <ContentsFiles Include="$(MSBuildProjectDirectory)\css\*.*">
+      <DirName>css</DirName>
+    </ContentsFiles>
+    <ContentsFiles Include="$(MSBuildProjectDirectory)\help\*.*">
+      <DirName>help</DirName>
+    </ContentsFiles>
+    <ContentsFiles Include="$(MSBuildProjectDirectory)\images\*.*">
+      <DirName>images</DirName>
+    </ContentsFiles>
+    </ItemGroup>
+  
+  <Target Name="Build">
+        <MSBuild Projects="MarkDownSharpEditor.sln" Properties="Configuration=Release; 
+          Architecture=x86"/>
+
+  </Target>
+  <Target Name="ReleaseCopy">
+      <RemoveDir
+            Directories="$(LatestOutputDirectory)" />
+      <MakeDir
+            Directories="$(LatestOutputDirectory)"/>
+
+      <Copy SourceFiles="@(MySourceFiles)"
+            DestinationFiles="@(MySourceFiles->'$(LatestOutputDirectory)\%(RecursiveDir)%(Filename)%(Extension)')" />
+    
+      <MakeDir
+            Directories="$(OutputDirectory)\@(ContentsFiles.DirName)"/>
+    <!--
+      <Copy SourceFiles="$(MSBuildProjectDirectory)\css\*.*"
+            DestinationFolder="$(LatestOutputDirectory)\css" />
+      <Copy SourceFiles="$(MSBuildProjectDirectory)\help\*.*"
+            DestinationFolder="$(LatestOutputDirectory)\help" />
+      <Copy SourceFiles="$(MSBuildProjectDirectory)\images\*.*"
+            DestinationFolder="$(LatestOutputDirectory)\images" />
+    -->
+      <Copy SourceFiles="@(ContentsFiles)"
+            DestinationFiles="@(ContentsFiles->'$(LatestOutputDirectory)\%(DirName)\%(Filename)%(Extension)')" />
+</Target>
+</Project>

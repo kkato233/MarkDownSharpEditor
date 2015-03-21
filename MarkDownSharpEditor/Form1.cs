@@ -2046,7 +2046,7 @@ namespace MarkDownSharpEditor
             foreach (var item in list.Where(r => r.TextPos != null && r.TextLen != null))
             {
                 int diff = cursorPos - item.TextPos.Value;
-                if (diff >= 0 && diff < item.TextLen && diff <= minTargetTag)
+                if (diff >= 0 && diff <= item.TextLen && diff <= minTargetTag)
                 {
                     minTargetTag = diff;
                     targetTag = item;

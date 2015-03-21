@@ -732,6 +732,7 @@ namespace MarkDownSharpEditor
 			{
 				webBrowser1.Document.OpenNew(true);
 				webBrowser1.Document.Write("");
+                RefreshBrowserCache();
 			}
 		}
 
@@ -1415,6 +1416,7 @@ namespace MarkDownSharpEditor
 					if (doc == null)
 					{
 						webBrowser1.Navigate("about:blank");
+                        RefreshBrowserCache();
 					}
 					else
 					{
@@ -1498,6 +1500,7 @@ namespace MarkDownSharpEditor
             timerCount = 0;
 
             this.webBrowser1.DocumentText = html;
+            RefreshBrowserCache();
 
             browserWaitTimer.Enabled = true;
 
@@ -1837,8 +1840,61 @@ namespace MarkDownSharpEditor
 
         class TagPos
         {
-            public int OffsetTop;
-            public int OffsetHeight;
+            public TagPos()
+            {
+
+            }
+            public TagPos Clone()
+            {
+                TagPos c = new TagPos()
+                {
+                    OffsetTop = this.OffsetTop,
+                    OffsetAbsDiff = this.OffsetAbsDiff,
+                    OffsetHeight = this.OffsetHeight,
+                    e = this.e,
+                    TextPos = this.TextPos,
+                    TextLen = this.TextLen,
+#if DEBUG
+                    outerText = this.outerText,
+#endif
+                };
+
+                return c;
+            }
+            public int OffsetTop
+            {
+                get
+                {
+                    if (this._OffsetTop != null) return _OffsetTop.Value;
+                    if (this.e != null)
+                    {
+                        this._OffsetTop = e.offsetTop;
+                    }
+                    return this._OffsetTop.Value;
+                }
+                set
+                {
+                    this._OffsetTop = value;
+                }
+            }
+            int ? _OffsetTop;
+            public int OffsetHeight
+            {
+                get
+                {
+                    if (this._OffsetHeight != null) return _OffsetHeight.Value;
+                    if (this.e != null)
+                    {
+                        this._OffsetHeight = e.offsetTop;
+                    }
+                    return this._OffsetHeight.Value;
+                }
+                set
+                {
+                    this._OffsetHeight = value;
+                }
+            }
+            int? _OffsetHeight;
             public IHTMLElement e;
 
             public int? TextPos;
@@ -2007,7 +2063,7 @@ namespace MarkDownSharpEditor
             var topItem = list.FirstOrDefault();
             if (topItem != null)
             {
-                Point scrollPos = new Point(0,topItem.OffsetTop);
+                Point scrollPos = new Point(0, topItem.OffsetTop);
                 this.webBrowser1.Document.Window.ScrollTo(scrollPos);
             }
 
@@ -2080,8 +2136,24 @@ namespace MarkDownSharpEditor
             }
         }
 
+        // データをキャッシュしておき、内容が変更されていない場合はキャッシュした値を返す。
+        List<TagPos> tagPosCache = null;
+        
+        /// <summary>
+        /// ブラウザのキャッシュを更新する
+        /// </summary>
+        void RefreshBrowserCache()
+        {
+            this.tagPosCache = null;
+        }
+
         List<TagPos> GetBrowserDocumentTagPos()
         {
+            if (this.tagPosCache != null)
+            {
+                return this.tagPosCache;
+            }
+
             IHTMLDocument3 doc3 = (IHTMLDocument3)webBrowser1.Document.DomDocument;
             IHTMLElement2 elm = (IHTMLElement2)doc3.documentElement;
 
@@ -2104,8 +2176,8 @@ namespace MarkDownSharpEditor
                     var tag = new TagPos()
                     {
                         e = e,
-                        OffsetTop = e.offsetTop,
-                        OffsetHeight = e.offsetHeight,
+                        //OffsetTop = e.offsetTop,
+                        //OffsetHeight = e.offsetHeight,
                     };
 
                     // offsetTop は body からの位置になるように補正
@@ -2140,6 +2212,9 @@ namespace MarkDownSharpEditor
                     list.Add(tag);
                 }
             }
+
+            this.tagPosCache = list;
+
             return list;
         }
         
@@ -4028,6 +4103,11 @@ namespace MarkDownSharpEditor
         private void azukiRichTextBox1_CaretMoved(object sender, EventArgs e)
         {
             Idle_Hightlight = 1;
+        }
+
+        private void webBrowser1_Resize(object sender, EventArgs e)
+        {
+            RefreshBrowserCache();
         }
 
 		//======================================================================

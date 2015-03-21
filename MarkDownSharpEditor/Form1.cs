@@ -584,11 +584,14 @@ namespace MarkDownSharpEditor
 		//----------------------------------------------------------------------
 		private void richTextBox1_Enter(object sender, EventArgs e)
 		{
-			//ブラウザプレビュー制御 / Preview webBrowser component
-			if (MarkDownSharpEditor.AppSettings.Instance.fAutoBrowserPreview == true)
-			{
-				timer1.Enabled = true;
-			}
+            // 2015.03.21 この処理はフォーカス位置更新のためにあるが、
+            // 新バージョンでは不要。
+            ////ブラウザプレビュー制御 / Preview webBrowser component
+            //if (MarkDownSharpEditor.AppSettings.Instance.fAutoBrowserPreview == true)
+            //{
+            //    timer1.Enabled = true;
+            //}
+            // 2015.03.21 End
 		}
 
 		//----------------------------------------------------------------------

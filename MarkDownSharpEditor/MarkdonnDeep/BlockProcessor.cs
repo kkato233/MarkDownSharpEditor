@@ -134,9 +134,7 @@ namespace MarkdownDeep
 							prevline.RevertToPlain();
 							prevline.blockType = b.blockType == BlockType.post_h1 ? BlockType.h1 : BlockType.h2;
 							blocks.Add(prevline);
-
-                            blocks.Add(b); // === をブロックに追加
-							
+                            prevline.lineLen = b.lineStart + b.lineLen - prevline.lineStart;
                             continue;
 						}
 					}

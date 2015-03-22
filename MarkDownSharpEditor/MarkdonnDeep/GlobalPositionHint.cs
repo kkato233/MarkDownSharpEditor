@@ -40,6 +40,8 @@ namespace MarkdownDeep
         /// <returns></returns>
         public int GetGlobalPosAt(int pos)
         {
+            if (pos < 0 || pos >= globalPos.Count) return -1;
+
             return globalPos[pos];
         }
         public string GlobalStr

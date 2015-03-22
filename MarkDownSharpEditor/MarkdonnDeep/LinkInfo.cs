@@ -21,16 +21,14 @@ namespace MarkdownDeep
 {
 	internal class LinkInfo
 	{
-		public LinkInfo(LinkDefinition def, string link_text, string cssClass = null)
+		public LinkInfo(LinkDefinition def, string link_text)
 		{
 			this.def = def;
 			this.link_text = link_text;
-			this.cssClass = cssClass;
 		}
 
 		public LinkDefinition def;
 		public string link_text;
-		public string cssClass;
 	}
 
 }

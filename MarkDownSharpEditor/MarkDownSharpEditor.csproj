@@ -109,8 +109,10 @@
     <Compile Include="AppSettings.cs" />
     <Compile Include="Azuki\AzukiExtentions.cs" />
     <Compile Include="Azuki\EncodingAnalyzer.cs" />
+    <Compile Include="Azuki\MarkdownHighlighterEx.cs" />
     <Compile Include="Azuki\MarkdownHighlighter.cs" />
     <Compile Include="MarkdonnDeep\GlobalPositionHint.cs" />
+    <Compile Include="MarkdonnDeep\RenderPosition.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

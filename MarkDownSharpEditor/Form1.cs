@@ -51,7 +51,7 @@ namespace MarkDownSharpEditor
 		//private ICollection<MarkdownSyntaxKeyword> _MarkdownSyntaxKeywordAarray;
 
         private Azuki.AzukeRTF richTextBox1;
-        private Azuki.MarkdownHighlighter highlighter;
+        private Azuki.MarkdownHighlighterEx highlighter;
 
 		//-----------------------------------
 		// コンストラクタ ( Constructor )
@@ -61,7 +61,7 @@ namespace MarkDownSharpEditor
 			InitializeComponent();
 
             // RichTextBox を Azuki に置き換え 
-            highlighter = new Azuki.MarkdownHighlighter(this.azukiRichTextBox1.Document);
+            highlighter = new Azuki.MarkdownHighlighterEx(this.azukiRichTextBox1);
             this.azukiRichTextBox1.Highlighter = highlighter;
             this.azukiRichTextBox1.ColorScheme = highlighter.MarkDownColorScheme;
             this.azukiRichTextBox1.Document.EolCode = "\n";
@@ -1300,11 +1300,6 @@ namespace MarkDownSharpEditor
 			// Set options
 			mkdwn.ExtraMode = MarkDownSharpEditor.AppSettings.Instance.fMarkdownExtraMode;
 			mkdwn.SafeMode = false;
-            
-            mkdwn.GfmOptions.AutoImageLinks = true;
-            mkdwn.GfmOptions.DoubleSquareBracketLinks = true;
-            mkdwn.GfmOptions.Linebreaks = true;
-            mkdwn.GfmOptions.SpacesInLinks = true;
             //-----------------------------------
 
 			ResultText = mkdwn.Transform(ResultText);
@@ -1466,6 +1461,8 @@ namespace MarkDownSharpEditor
                         {
                             this.BeginInvoke(new Action(() =>
                             {
+                                if (this.webBrowser1.Document.Body == null) return;
+
                             	ScrollSyncToText();
 
                             	this.webBrowser1.Document.Body.AttachEventHandler("onclick", OnClickEventHandler);
@@ -1917,7 +1914,14 @@ namespace MarkDownSharpEditor
                 this._ClassName = strName;
                 if (this.e != null)
                 {
-                    this.e.setAttribute("className", strName);
+                    try
+                    {
+                        this.e.setAttribute("className", strName);
+                    }
+                    catch(UnauthorizedAccessException)
+                    {
+                        // なぜか発生する 権限エラーは無視する
+                    }
                 }
             }
         }
@@ -2407,11 +2411,6 @@ namespace MarkDownSharpEditor
 			// Set options
 			mkdwn.ExtraMode = MarkDownSharpEditor.AppSettings.Instance.fMarkdownExtraMode;
 			mkdwn.SafeMode = false;
-
-            mkdwn.GfmOptions.AutoImageLinks = true;
-            mkdwn.GfmOptions.DoubleSquareBracketLinks = true;
-            mkdwn.GfmOptions.Linebreaks = true;
-            mkdwn.GfmOptions.SpacesInLinks = true;
 			//-----------------------------------
 
 			//編集中のファイル（richEditBoxの内容）
@@ -3297,7 +3296,7 @@ namespace MarkDownSharpEditor
 
 			//_MarkdownSyntaxKeywordAarray = MarkdownSyntaxKeyword.CreateKeywordList();	 //キーワードリストの更新
 
-            highlighter = new Azuki.MarkdownHighlighter(this.azukiRichTextBox1.Document);
+            highlighter = new Azuki.MarkdownHighlighterEx(this.azukiRichTextBox1);
             this.azukiRichTextBox1.Highlighter = highlighter;
             this.azukiRichTextBox1.ColorScheme = highlighter.MarkDownColorScheme;
 

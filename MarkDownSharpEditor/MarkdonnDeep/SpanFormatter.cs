@@ -29,11 +29,10 @@ namespace MarkdownDeep
 			m_Markdown = m;
 		}
 
-
-        internal void FormatParagraph(StringBuilder dest, string str, int start, int len, GlobalPositionHint hint = null)
+        internal void FormatParagraph(StringBuilder dest, string str, int start, int len, GlobalPositionHint hint = null, List<RenderPosition> positionList = null)
 		{
 			// Parse the string into a list of tokens
-			Tokenize(str, start, len);
+            Tokenize(str, start, len, positionList, hint);
 
 			// Titled image?
 			if (m_Tokens.Count == 1 && m_Markdown.HtmlClassTitledImages != null && m_Tokens[0].type == TokenType.img)
@@ -56,7 +55,7 @@ namespace MarkdownDeep
 				if (!String.IsNullOrEmpty(li.def.title))
 				{
                     dest.Append("<p");
-                    dest.Append(GetDataPosHtmlAttribute(m_Markdown,start,len,hint));
+                    dest.Append(GetDataPosHtmlAttribute(start,len,hint));
                     dest.Append(">");
 					Utils.SmartHtmlEncodeAmpsAndAngles(dest, li.def.title);
 					dest.Append("</p>\n");
@@ -68,32 +67,36 @@ namespace MarkdownDeep
 			{
 				// Render the paragraph
                 dest.Append("<p");
-                dest.Append(GetDataPosHtmlAttribute(m_Markdown, start, len, hint));
+                dest.Append(GetDataPosHtmlAttribute(start, len, hint));
                 dest.Append(">");
 				Render(dest, str);
 				dest.Append("</p>\n");
 			}
 		}
         
-        internal void Format(StringBuilder dest, string str, GlobalPositionHint hint = null)
+        internal void Format(StringBuilder dest, string str, GlobalPositionHint hint = null, List<RenderPosition> positionList = null)
 		{
-			Format(dest, str, 0, str.Length, hint);
+            Format(dest, str, 0, str.Length, hint, positionList);
 		}
 
 		// Format a range in an input string and write it to the destination string builder.
-		internal void Format(StringBuilder dest, string str, int start, int len, GlobalPositionHint hint = null)
+        internal void Format(StringBuilder dest, string str, int start, int len, GlobalPositionHint hint = null, List<RenderPosition> positionList = null)
 		{
+            if (positionList == null)
+            {
+                positionList = new List<RenderPosition>();
+            }
 			// Parse the string into a list of tokens
-			Tokenize(str, start, len, hint);
+			Tokenize(str, start, len,positionList, hint);
 
 			// Render all tokens
 			Render(dest, str, hint);
 		}
 
-		internal void FormatPlain(StringBuilder dest, string str, int start, int len, GlobalPositionHint hint = null)
+        internal void FormatPlain(StringBuilder dest, string str, int start, int len, GlobalPositionHint hint = null, List<RenderPosition> positionList = null)
 		{
 			// Parse the string into a list of tokens
-			Tokenize(str, start, len, hint);
+            Tokenize(str, start, len, positionList, hint);
 
 			// Render all tokens
 			RenderPlain(dest, str);
@@ -101,10 +104,10 @@ namespace MarkdownDeep
 
 		// Format a string and return it as a new string
 		// (used in formatting the text of links)
-        internal string Format(string str, GlobalPositionHint hint = null)
+        internal string Format(string str, GlobalPositionHint hint = null, List<RenderPosition> positionList = null)
 		{
 			StringBuilder dest = new StringBuilder();
-			Format(dest, str, 0, str.Length, hint);
+			Format(dest, str, 0, str.Length, hint, positionList);
 			return dest.ToString();
 		}
 
@@ -116,7 +119,7 @@ namespace MarkdownDeep
 		internal string MakeID(string str, int start, int len)
 		{
 			// Parse the string into a list of tokens
-			Tokenize(str, start, len);
+			Tokenize(str, start, len, new List<RenderPosition>());
 	
 			StringBuilder sb = new StringBuilder();
 
@@ -250,7 +253,7 @@ namespace MarkdownDeep
 					{
 						FootnoteReference r=(FootnoteReference)t.data;
                         sb.Append("<sup");
-                        sb.Append(GetDataPosHtmlAttribute(t.startOffset, str));
+                        sb.Append(GetDataPosHtmlAttribute(t));
                         sb.Append(" id=\"fnref:");
 						sb.Append(r.id);
 						sb.Append("\"><a href=\"#fn:");
@@ -265,7 +268,7 @@ namespace MarkdownDeep
 					{
 						Abbreviation a = (Abbreviation)t.data;
                         sb.Append("<abbr");
-                        sb.Append(GetDataPosHtmlAttribute(t.startOffset, str));
+                        sb.Append(GetDataPosHtmlAttribute(t));
 						if (!String.IsNullOrEmpty(a.Title))
 						{
 							sb.Append(" title=\"");
@@ -284,7 +287,7 @@ namespace MarkdownDeep
 		}
 
 		// Render a list of tokens to a destinatino string builder.
-		private void RenderPlain(StringBuilder sb, string str)
+        private void RenderPlain(StringBuilder sb, string str, GlobalPositionHint hint = null)
 		{
 			foreach (Token t in m_Tokens)
 			{
@@ -340,7 +343,7 @@ namespace MarkdownDeep
 		}
 
 		// Scan the input string, creating tokens for anything special 
-		public void Tokenize(string str, int start, int len, GlobalPositionHint hint = null)
+        public void Tokenize(string str, int start, int len, List<RenderPosition> positionList, GlobalPositionHint hint = null)
 		{
 			// Prepare
 			base.Reset(str, start, len, hint);
@@ -365,7 +368,7 @@ namespace MarkdownDeep
 					case '_':
 
 						// Create emphasis mark
-						token = CreateEmphasisMark();
+						token = CreateEmphasisMark(hint);
 
 						if (token != null)
 						{
@@ -386,7 +389,7 @@ namespace MarkdownDeep
 						break;
 
 					case '`':
-						token = ProcessCodeSpan();
+						token = ProcessCodeSpan(hint);
 						break;
 
 					case '[':
@@ -394,7 +397,7 @@ namespace MarkdownDeep
 					{
 						// Process link reference
 						int linkpos = position;
-						token = ProcessLinkOrImageOrFootnote();
+						token = ProcessLinkOrImageOrFootnote(hint);
 
 						// Rewind if invalid syntax
 						// (the '[' or '!' will be treated as a regular character and processed below)
@@ -413,7 +416,7 @@ namespace MarkdownDeep
 							if (!m_Markdown.SafeMode || tag.IsSafe())
 							{
 								// Yes, create a token for it
-								token = CreateToken(TokenType.HtmlTag, save, position - save);
+								token = CreateToken(TokenType.HtmlTag, save, position - save, hint);
 							}
 							else
 							{
@@ -441,7 +444,7 @@ namespace MarkdownDeep
 						if (SkipHtmlEntity(ref unused))
 						{
 							// Yes, create a token for it
-							token = CreateToken(TokenType.Html, save, position - save);
+							token = CreateToken(TokenType.Html, save, position - save, hint);
 						}
 
 						break;
@@ -459,20 +462,7 @@ namespace MarkdownDeep
 							if (!eof)
 							{
 								SkipEol();
-								token = CreateToken(TokenType.br, end_text_token, 0);
-							}
-						}
-						break;
-					}
-
-					case '\n':
-					{
-						if (m_Markdown.GfmOptions.Linebreaks)
-						{
-							if (!eof)
-							{
-								SkipEol();
-								token = CreateToken(TokenType.br, end_text_token, 0);
+								token = CreateToken(TokenType.br, end_text_token, 0, hint);
 							}
 						}
 						break;
@@ -502,7 +492,7 @@ namespace MarkdownDeep
 							// Check followed by an escapable character
 							if (Utils.IsEscapableChar(CharAtOffset(1), ExtraMode))
 							{
-								token = CreateToken(TokenType.Text, position + 1, 1);
+								token = CreateToken(TokenType.Text, position + 1, 1, hint);
 								SkipForward(2);
 							}
 						}
@@ -533,7 +523,7 @@ namespace MarkdownDeep
 					// Create a token for everything up to the special character
 					if (end_text_token > start_text_token)
 					{
-						m_Tokens.Add(CreateToken(TokenType.Text, start_text_token, end_text_token-start_text_token));
+						m_Tokens.Add(CreateToken(TokenType.Text, start_text_token, end_text_token-start_text_token, hint));
 					}
 
 					// Add the new token
@@ -552,13 +542,31 @@ namespace MarkdownDeep
 			// Append a token for any trailing text after the last token.
 			if (position > start_text_token)
 			{
-				m_Tokens.Add(CreateToken(TokenType.Text, start_text_token, position-start_text_token));
+				m_Tokens.Add(CreateToken(TokenType.Text, start_text_token, position-start_text_token, hint));
 			}
 
 			// Do we need to resolve and emphasis marks?
 			if (emphasis_marks != null)
 			{
-				ResolveEmphasisMarks(m_Tokens, emphasis_marks);
+				ResolveEmphasisMarks(m_Tokens, emphasis_marks, hint);
+			}
+
+            if (positionList != null)
+            {
+                foreach (var t in m_Tokens)
+                {
+                    if (t.hint == null) continue;
+
+                    int pos = t.hint.GetGlobalPosAt(t.startOffset);
+
+
+                    positionList.Add(new RenderPosition()
+                    {
+                        TokenType = t.type,
+                        Start = pos,
+                        Len = t.length,
+                    });
+                }
 			}
 
 			// Done!
@@ -584,7 +592,7 @@ namespace MarkdownDeep
 		 */
 
 		// Create emphasis mark for sequences of '*' and '_' (part 1)
-		public Token CreateEmphasisMark()
+		public Token CreateEmphasisMark(GlobalPositionHint hint)
 		{
 			// Capture current state
 			char ch = current;
@@ -599,7 +607,7 @@ namespace MarkdownDeep
 
 				if (eof || char.IsWhiteSpace(current))
 				{
-					return new Token(TokenType.Html, savepos, position - savepos);
+					return new Token(TokenType.Html, savepos, position - savepos, hint);
 				}
 
 				// Rewind
@@ -630,25 +638,25 @@ namespace MarkdownDeep
 
 			if (bSpaceBefore)
 			{
-				return CreateToken(TokenType.opening_mark, savepos, position - savepos);
+				return CreateToken(TokenType.opening_mark, savepos, position - savepos, hint);
 			}
 
 			if (bSpaceAfter)
 			{
-				return CreateToken(TokenType.closing_mark, savepos, position - savepos);
+				return CreateToken(TokenType.closing_mark, savepos, position - savepos, hint);
 			}
 
-			if (m_Markdown.ExtraMode && ch == '_')
+			if (m_Markdown.ExtraMode && ch == '_' && (Char.IsLetterOrDigit(current)))
 				return null;
 
-			return CreateToken(TokenType.internal_mark, savepos, position - savepos);
+			return CreateToken(TokenType.internal_mark, savepos, position - savepos, hint);
 		}
 
 		// Split mark token
-		public Token SplitMarkToken(List<Token> tokens, List<Token> marks, Token token, int position)
+		public Token SplitMarkToken(List<Token> tokens, List<Token> marks, Token token, int position, GlobalPositionHint hint = null)
 		{
 			// Create the new rhs token
-			Token tokenRhs = CreateToken(token.type, token.startOffset + position, token.length - position);
+			Token tokenRhs = CreateToken(token.type, token.startOffset + position, token.length - position, hint);
 
 			// Adjust down the length of this token
 			token.length = position;
@@ -662,7 +670,7 @@ namespace MarkdownDeep
 		}
 
 		// Resolve emphasis marks (part 2)
-		public void ResolveEmphasisMarks(List<Token> tokens, List<Token> marks)
+        public void ResolveEmphasisMarks(List<Token> tokens, List<Token> marks, GlobalPositionHint hint = null)
 		{
 			bool bContinue = true;
 			while (bContinue)
@@ -699,14 +707,14 @@ namespace MarkdownDeep
 						// Split the opening mark, keeping the RHS
 						if (opening_mark.length > style)
 						{
-							opening_mark = SplitMarkToken(tokens, marks, opening_mark, opening_mark.length - style);
+							opening_mark = SplitMarkToken(tokens, marks, opening_mark, opening_mark.length - style, hint);
 							i--;
 						}
 
 						// Split the closing mark, keeping the LHS
 						if (closing_mark.length > style)
 						{
-							SplitMarkToken(tokens, marks, closing_mark, style);
+							SplitMarkToken(tokens, marks, closing_mark, style, hint);
 						}
 
 						// Connect them
@@ -963,7 +971,20 @@ namespace MarkdownDeep
 		}
 
 		// Process [link] and ![image] directives
-		Token ProcessLinkOrImageOrFootnote()
+        Token ProcessLinkOrImageOrFootnote(GlobalPositionHint hint)
+        {
+            int linkStartPos = position;
+            Token token = ProcessLinkOrImageOrFootnote_internal(hint);
+            if (token != null)
+            {
+                token.hint = hint;
+                token.startOffset = linkStartPos;
+                token.length = position - linkStartPos;
+            }
+            return token;
+        }
+
+		Token ProcessLinkOrImageOrFootnote_internal(GlobalPositionHint hint)
 		{
 			// Link or image?
 			TokenType token_type = SkipChar('!') ? TokenType.img : TokenType.link;
@@ -971,9 +992,6 @@ namespace MarkdownDeep
 			// Opening '['
 			if (!SkipChar('['))
 				return null;
-
-			// Check for second '[' for [[Link]] type links
-			bool doubleBracketed = m_Markdown.GfmOptions.DoubleSquareBracketLinks && SkipChar('[');
 
 			// Is it a foonote?
 			var savepos=position;
@@ -990,7 +1008,7 @@ namespace MarkdownDeep
 					if (footnote_index >= 0)
 					{
 						// Yes it's a footnote
-						return CreateToken(TokenType.footnote, new FootnoteReference(footnote_index, id));
+						return CreateToken(TokenType.footnote, new FootnoteReference(footnote_index, id),hint);
 					}
 				}
 
@@ -1034,36 +1052,6 @@ namespace MarkdownDeep
 			// The closing ']'
 			SkipForward(1);
 
-			// The second closing ']' for [[Link]] links
-			if (doubleBracketed)
-			{
-				if (SkipChar(']'))
-				{
-					var parts = link_text.Split('|');
-					var url = parts.Length > 1 ? parts[1] : parts[0];
-					var title = parts[0];
-
-					if (m_Markdown.GfmOptions.AutoImageLinks && ((title.EndsWith(".png") || title.EndsWith(".jpg") || title.EndsWith(".gif"))))
-					{
-						var framed = (url == "frame");
-						url = title;
-						if (m_Markdown.GfmOptions.SpacesInLinks) url = url.Replace(' ', '-'); // TODO: Duplicating the ' ' to '-' logic
-						title = title.Substring(0, title.Length - 4);
-						return CreateToken(TokenType.img, new LinkInfo(new LinkDefinition(null, url, null), title, framed ? "frame" : null));
-					}
-
-					// TODO: Should use LinkDefinition.ParseLinkTarget, as we are duplicating the ' ' to '-' logic, but not sure how to do that
-					if (m_Markdown.GfmOptions.SpacesInLinks) url = url.Replace(' ', '-');
-					var link_def = new LinkDefinition(null, url, null);
-					return CreateToken(token_type, new LinkInfo(link_def, title));
-				}
-				else
-				{
-					position = savepos;
-					return null;
-				}
-			}
-
 			// Save position in case we need to rewind
 			savepos = position;
 
@@ -1071,7 +1059,7 @@ namespace MarkdownDeep
 			if (SkipChar('('))
 			{
 				// Extract the url and title
-                var link_def = LinkDefinition.ParseLinkTarget(this, null, m_Markdown.ExtraMode, m_Markdown.GfmOptions.SpacesInLinks);
+				var link_def = LinkDefinition.ParseLinkTarget(this, null, m_Markdown.ExtraMode);
 				if (link_def==null)
 					return null;
 
@@ -1081,7 +1069,7 @@ namespace MarkdownDeep
 					return null;
 
 				// Create the token
-				return CreateToken(token_type, new LinkInfo(link_def, link_text));
+				return CreateToken(token_type, new LinkInfo(link_def, link_text),hint);
 			}
 
 			// Optional space or tab
@@ -1142,11 +1130,11 @@ namespace MarkdownDeep
 				return null;
 
 			// Create a token
-			return CreateToken(token_type, new LinkInfo(def, link_text));
+			return CreateToken(token_type, new LinkInfo(def, link_text),hint);
 		}
 
 		// Process a ``` code span ```
-		Token ProcessCodeSpan()
+		Token ProcessCodeSpan(GlobalPositionHint hint)
 		{
 			int start = position;
 
@@ -1162,13 +1150,13 @@ namespace MarkdownDeep
 
 			// End?
 			if (eof)
-				return CreateToken(TokenType.Text, start, position - start);
+				return CreateToken(TokenType.Text, start, position - start,hint);
 
 			int startofcode = position;
 
 			// Find closing ticks
 			if (!Find(Substring(start, tickcount)))
-				return CreateToken(TokenType.Text, start, position - start);
+				return CreateToken(TokenType.Text, start, position - start,hint);
 
 			// Save end position before backing up over trailing whitespace
 			int endpos = position + tickcount;
@@ -1176,7 +1164,7 @@ namespace MarkdownDeep
 				SkipForward(-1);
 
 			// Create the token, move back to the end and we're done
-			var ret = CreateToken(TokenType.code_span, startofcode, position - startofcode);
+			var ret = CreateToken(TokenType.code_span, startofcode, position - startofcode,hint);
 			position = endpos;
 			return ret;
 		}
@@ -1229,10 +1217,9 @@ namespace MarkdownDeep
 		Markdown m_Markdown;
 		internal bool DisableLinks;
 		List<Token> m_Tokens=new List<Token>();
-
-        public string GetDataPosHtmlAttribute(Markdown m, int start, int len, GlobalPositionHint hint)
+		public string GetDataPosHtmlAttribute(int start,int len, GlobalPositionHint hint)
         {
-            if (m.RenderPos == false) return "";
+            if (this.m_Markdown.RenderPos == false) return "";
 
             if (hint == null) return "";
 
@@ -1243,6 +1230,8 @@ namespace MarkdownDeep
         }
         public string GetDataPosHtmlAttribute(Token t)
         {
+            if (this.m_Markdown.RenderPos == false) return "";
+
             if (t == null) return "";
             if (t.hint == null) return "";
             int pos = t.hint.GetGlobalPosAt(t.startOffset);
@@ -1251,18 +1240,5 @@ namespace MarkdownDeep
 
             return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
         }
-        public string GetDataPosHtmlAttribute(int pos,string buf)
-        {
-            if (this.m_Markdown.RenderPos == false) return "";
-
-            if (this.hint == null) return "";
-
-            int dPos = hint.GetGlobalPosAt(pos);
-
-            if (dPos <= 0) return "";
-
-            return " data-pos='" + dPos.ToString() + "'";
-        }
-        
 	}
 }

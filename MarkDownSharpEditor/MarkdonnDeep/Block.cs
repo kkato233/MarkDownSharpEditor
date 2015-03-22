@@ -630,7 +630,7 @@ namespace MarkdownDeep
             int len = this.contentLen;
             int start = this.contentStart;
 
-            if (start == 0 && this.children.Any())
+            if (start == 0 && this.children != null && this.children.Any())
             {
                 start = this.children.Where(r => r.hint != null)
                     .Min(r => r.hint.GetGlobalPosAt(r.contentStart));

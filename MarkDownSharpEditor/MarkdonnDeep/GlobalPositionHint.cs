@@ -42,7 +42,12 @@ namespace MarkdownDeep
         {
             if (pos < 0 || pos >= globalPos.Count) return -1;
 
-            return globalPos[pos];
+            int ans = globalPos[pos];
+            if (ans < 0 && pos > 0)
+            {
+                ans = globalPos[pos - 1];
+            }
+            return ans;
         }
         public string GlobalStr
         {

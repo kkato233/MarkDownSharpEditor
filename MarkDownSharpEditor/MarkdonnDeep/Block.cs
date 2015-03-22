@@ -627,14 +627,31 @@ namespace MarkdownDeep
         public string GetDataPosHtmlAttribute(Markdown m)
         {
             if (m.RenderPos == false) return "";
-
-            if (this.hint == null) return "";
             int len = this.contentLen;
+            int start = this.contentStart;
+
+            if (start == 0 && this.children.Any())
+            {
+                start = this.children.Where(r => r.hint != null)
+                    .Min(r => r.hint.GetGlobalPosAt(r.contentStart));
+
+                int end = this.children.Where(r => r.hint != null)
+                    .Max(r => r.hint.GetGlobalPosAt(r.contentStart + r.contentLen));
+
+                len = Math.Max(end - start, 0);
+            }
+            else if (this.hint == null)
+            {
+                return "";
+            }
             if (len == 0) return "";
 
-            int pos = this.hint.GetGlobalPosAt(this.contentStart);
+            if (this.hint != null)
+            {
+                start = this.hint.GetGlobalPosAt(this.contentStart);
+            }
 
-            return " data-pos='" + pos.ToString() + "' data-len='" + len.ToString() + "'";
+            return " data-pos='" + start.ToString() + "' data-len='" + len.ToString() + "'";
         }
 
         public string GetCodeLangAttribute(Markdown m)

@@ -1865,7 +1865,18 @@ namespace MarkDownSharpEditor
                     if (this._OffsetTop != null) return _OffsetTop.Value;
                     if (this.e != null)
                     {
-                        this._OffsetTop = e.offsetTop;
+                        int top = e.offsetTop;
+                        var parent = e.parentElement;
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (parent != null)
+                            {
+                                top += parent.offsetTop;
+
+                                parent = parent.parentElement;
+                            }
+                        }
+                        this._OffsetTop = top;
                     }
                     return this._OffsetTop.Value;
                 }
